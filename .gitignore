@@ -1,8 +1,5 @@
 # Data stuff
-data/jpg/train/*
-data/jpg/test/*
-data/tiff/train/*
-data/tiff/test/*
+data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
