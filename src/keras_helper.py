@@ -1,8 +1,6 @@
 import numpy as np
-import pandas as pd
 import os
 import gc
-from itertools import chain
 
 from sklearn.metrics import fbeta_score
 
@@ -29,28 +27,8 @@ class LossHistory(Callback):
 
 
 class AmazonKerasClassifier:
-    def __init__(self, train_set_folder, test_set_folder, train_csv_file):
+    def __init__(self, ):
         self.losses = []
-        self.train_set_folder = train_set_folder
-        self.test_set_folder = test_set_folder
-        self.train_csv_file = train_csv_file
-
-    def _preprocess_data(self):
-        labels_df = pd.read_csv(self.train_csv_file)
-        labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
-        label_map = {l: i for i, l in enumerate(labels)}
-
-        print(label_map)
-        # for f, tags in tqdm(df_train.values, miniters=1000):
-        #     img = cv2.imread('../input/train-jpg/{}.jpg'.format(f))
-        #     targets = np.zeros(17)
-        #     for t in tags.split(' '):
-        #         targets[label_map[t]] = 1
-        #     x_train.append(cv2.resize(img, (32, 32)))
-        #     y_train.append(targets)
-        # train_datagen = ImageDataGenerator(rescale=1. / 255).flow()
-        # test_datagen = ImageDataGenerator(rescale=1. / 255).flow()
-        # return [training_set, test_set]
 
     def train_model(self, epoch, batch_size, ):
         history = LossHistory()

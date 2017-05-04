@@ -57,6 +57,14 @@ def _get_test_matrices(test_set_folder, img_resize):
 
 
 def preprocess_data(train_set_folder, test_set_folder, train_csv_file, img_resize=(32, 32)):
+    """
+    Transform the images to ready to use data for CNN
+    :param train_set_folder: the folder containing the images for training
+    :param test_set_folder: the folder containing the images for testing
+    :param train_csv_file: the file containing the labels of the training images
+    :param img_resize: the standard size you want to have on images when transformed to matrices
+    :return: The images matrices and labels as [x_train, x_test, y_train, labels_map]
+    """
     x_train, y_train, labels_map = _get_train_matrices(train_set_folder, train_csv_file, lambda x: x / 255, img_resize)
     x_test = _get_test_matrices(test_set_folder, img_resize)
     print("Done.")
