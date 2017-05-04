@@ -3,12 +3,12 @@ import os
 
 def get_jpeg_data_files_paths():
     """
-    Returns the data file folders path
+    Returns the input file folders path
     
-    :return: The data file paths as list [train_jpeg_dir, test_jpeg_dir, train_csv_file]
+    :return: The input file paths as list [train_jpeg_dir, test_jpeg_dir, train_csv_file]
     """
 
-    data_root_folder = os.path.abspath("../data/")
+    data_root_folder = os.path.abspath("../input/")
     train_jpeg_dir = os.path.join(data_root_folder, 'train-jpg')
     test_jpeg_dir = os.path.join(data_root_folder, 'test-jpg')
     train_csv_file = os.path.join(data_root_folder, 'train.csv')
