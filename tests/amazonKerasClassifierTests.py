@@ -19,8 +19,8 @@ class TestAmazonKerasClassifier:
         img_resize = (64, 64)
         color_channels = 3  # RGB
         train_jpeg_dir, test_jpeg_dir, train_csv_file = data_helper.get_jpeg_data_files_paths()
-        x_train, x_test, y_train, y_map = data_helper.preprocess_data(train_jpeg_dir, test_jpeg_dir,
-                                                                      train_csv_file, img_resize)
+        x_train, x_test, y_train, y_map, x_test_filename = data_helper.preprocess_data(train_jpeg_dir, test_jpeg_dir,
+                                                                                       train_csv_file, img_resize)
         labels_df = pd.read_csv(train_csv_file)
         labels_count = len(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         train_files_count = len(os.listdir(train_jpeg_dir))
