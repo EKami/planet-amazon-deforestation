@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import gc
 
 from sklearn.metrics import fbeta_score
 from sklearn.model_selection import train_test_split
@@ -10,6 +9,7 @@ from tensorflow.contrib.keras.api.keras.models import Sequential
 from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten
 from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.contrib.keras.api.keras.callbacks import Callback
+from tensorflow.contrib.keras import backend
 
 
 class LossHistory(Callback):
@@ -66,11 +66,25 @@ class AmazonKerasClassifier:
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
 
-    def predict(self, x_test, labels_map):
+    def predict(self, x_test):
         predictions = self.classifier.predict(x_test)
+        return predictions
+
+    def map_predictions(self, predictions, labels_map, thresholds):
+        """
+        Return the predictions mapped to their labels
+        :param predictions: the predictions from the predict() method
+        :param labels_map: the map 
+        :param thresholds: The threshold of each class to be considered as existing or not existing
+        :return: the predictions list mapped to their labels
+        """
         predictions_labels = []
         for prediction in predictions:
-            labels = [labels_map[i] for i, value in enumerate(prediction) if value >= 1.0]
+            labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
             predictions_labels.append(labels)
 
         return predictions_labels
+
+    def close_classifier(self):
+        backend.clear_session()
+

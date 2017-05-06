@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from itertools import chain
+from multiprocessing import Pool, cpu_count
 
 
 def get_jpeg_data_files_paths():
@@ -35,6 +36,11 @@ def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize)
     y_train = []
     print("Transforming train data to matrices...")
     sys.stdout.flush()
+
+    # TODO finish
+    p = Pool(cpu_count())
+    #ret = p.map(get_features, paths)
+
     for file_name, tags in tqdm(labels_df.values):
         img = cv2.imread('{}/{}.jpg'.format(train_set_folder, file_name))
         targets = np.zeros(len(labels))
