@@ -27,40 +27,62 @@ def get_jpeg_data_files_paths():
     return [train_jpeg_dir, test_jpeg_dir, train_csv_file]
 
 
+def _train_transform_to_matrices(file_path, tags, labels_map, img_resize):
+    img_array = cv2.resize(cv2.imread(file_path), img_resize)
+    targets = np.zeros(len(labels_map))
+    for t in tags.split(' '):
+        targets[labels_map[t]] = 1
+    return img_array, targets
+
+
+def _test_transform_to_matrices(file_path, img_resize):
+    img_array = cv2.resize(cv2.imread(file_path), img_resize)
+    file_path = file_path.split("/")[-1]
+    return [img_array, file_path]
+
+
 def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize):
     labels_df = pd.read_csv(train_csv_file)
     labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
     labels_map = {l: i for i, l in enumerate(labels)}
 
+    files_path = []
+    tags_list = []
+    for file_name, tags in labels_df.values:
+        files_path.append('{}/{}.jpg'.format(train_set_folder, file_name))
+        tags_list.append(tags)
+
+    # Multiprocess transformation
     x_train = []
     y_train = []
-    print("Transforming train data to matrices...")
+    cpu_n = cpu_count()
+    pool = Pool(cpu_n)
+    print("Transforming train data to matrices. Using {} threads...".format(cpu_n))
     sys.stdout.flush()
-
-    # TODO finish
-    p = Pool(cpu_count())
-    #ret = p.map(get_features, paths)
-
-    for file_name, tags in tqdm(labels_df.values):
-        img = cv2.imread('{}/{}.jpg'.format(train_set_folder, file_name))
-        targets = np.zeros(len(labels))
-        for t in tags.split(' '):
-            targets[labels_map[t]] = 1
-        x_train.append(cv2.resize(img, img_resize))
+    for img_array, targets in pool.starmap(_train_transform_to_matrices,
+                                           ([file_path, tag, labels_map, img_resize]
+                                            for file_path, tag in zip(files_path, tags_list))):
+        x_train.append(img_array)
         y_train.append(targets)
+
     x_train = scale_fct(np.array(x_train, np.float32))
     return [x_train, np.array(y_train, np.uint8), {v: k for k, v in labels_map.items()}]
 
 
 def _get_test_matrices(test_set_folder, img_resize):
+    files_path = []
+    for file_name in os.listdir(test_set_folder):
+        files_path.append('{}/{}'.format(test_set_folder, file_name))
+
     x_test = []
     x_test_filename = []
-    files = os.listdir(test_set_folder)
-    print("Transforming test data to matrices...")
+    cpu_n = cpu_count()
+    pool = Pool(cpu_n)
+    print("Transforming test data to matrices. Using {} threads...".format(cpu_n))
     sys.stdout.flush()
-    for file_name in tqdm(files):
-        img = cv2.imread('{}/{}'.format(test_set_folder, file_name))
-        x_test.append(cv2.resize(img, img_resize))
+    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ([file_path, img_resize]
+                                                                           for file_path in files_path)):
+        x_test.append(img_array)
         x_test_filename.append(file_name)
     return [np.array(x_test, np.float32), np.array(x_test_filename)]
 
