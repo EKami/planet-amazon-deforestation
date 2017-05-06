@@ -35,10 +35,9 @@ def _train_transform_to_matrices(file_path, tags, labels_map, img_resize):
     return img_array, targets
 
 
-def _test_transform_to_matrices(file_path, img_resize):
-    img_array = cv2.resize(cv2.imread(file_path), img_resize)
-    file_path = file_path.split("/")[-1]
-    return [img_array, file_path]
+def _test_transform_to_matrices(test_set_folder, file_name, img_resize):
+    img_array = cv2.resize(cv2.imread('{}/{}'.format(test_set_folder, file_name)), img_resize)
+    return [img_array, file_name]
 
 
 def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize):
@@ -60,7 +59,7 @@ def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize)
     print("Transforming train data to matrices. Using {} threads...".format(cpu_n))
     sys.stdout.flush()
     for img_array, targets in pool.starmap(_train_transform_to_matrices,
-                                           ([file_path, tag, labels_map, img_resize]
+                                           ((file_path, tag, labels_map, img_resize)
                                             for file_path, tag in zip(files_path, tags_list))):
         x_train.append(img_array)
         y_train.append(targets)
@@ -70,18 +69,15 @@ def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize)
 
 
 def _get_test_matrices(test_set_folder, img_resize):
-    files_path = []
-    for file_name in os.listdir(test_set_folder):
-        files_path.append('{}/{}'.format(test_set_folder, file_name))
-
     x_test = []
     x_test_filename = []
     cpu_n = cpu_count()
     pool = Pool(cpu_n)
+    files_names = os.listdir(test_set_folder)
     print("Transforming test data to matrices. Using {} threads...".format(cpu_n))
     sys.stdout.flush()
-    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ([file_path, img_resize]
-                                                                           for file_path in files_path)):
+    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ((test_set_folder, file_name, img_resize)
+                                                                           for file_name in files_names)):
         x_test.append(img_array)
         x_test_filename.append(file_name)
     return [np.array(x_test, np.float32), np.array(x_test_filename)]
