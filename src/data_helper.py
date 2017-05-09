@@ -71,7 +71,7 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
                                             for file_path, tag in zip(files_path, tags_list)]):
             x_train.append(img_array)
             y_train.append(targets)
-    return [np.array(x_train), np.array(y_train, np.uint8), {v: k for k, v in labels_map.items()}]
+    return [x_train, y_train, {v: k for k, v in labels_map.items()}]
 
 
 def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process_count):
@@ -97,7 +97,7 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
             x_test.append(img_array)
             x_test_filename.append(file_name)
 
-    return [np.array(x_test, np.float32), np.array(x_test_filename)]
+    return [x_test, x_test_filename]
 
 
 def preprocess_data(train_set_folder, test_set_folder,
