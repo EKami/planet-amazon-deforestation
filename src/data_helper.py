@@ -66,9 +66,10 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
     print("Transforming train data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
     with ThreadPoolExecutor(process_count) as pool:
-        for img_array, targets in pool.map(_train_transform_to_matrices,
-                                           [[file_path, tag, labels_map, img_resize]
-                                            for file_path, tag in zip(files_path, tags_list)]):
+        for img_array, targets in tqdm(pool.map(_train_transform_to_matrices,
+                                                [[file_path, tag, labels_map, img_resize]
+                                                 for file_path, tag in zip(files_path, tags_list)]),
+                                       total=len(files_path)):
             x_train.append(img_array)
             y_train.append(targets)
     return [x_train, y_train, {v: k for k, v in labels_map.items()}]
@@ -82,18 +83,20 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
     print("Transforming test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
     with ThreadPoolExecutor(process_count) as pool:
-        for img_array, file_name in pool.map(_test_transform_to_matrices,
+        for img_array, file_name in tqdm(pool.map(_test_transform_to_matrices,
                                              [[test_set_folder, file_name, img_resize]
-                                              for file_name in files_name]):
+                                              for file_name in files_name]),
+                                         total=len(files_name)):
             x_test.append(img_array)
             x_test_filename.append(file_name)
 
     print("Transforming additional test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
     with ThreadPoolExecutor(process_count) as pool:
-        for img_array, file_name in pool.map(_test_transform_to_matrices,
+        for img_array, file_name in tqdm(pool.map(_test_transform_to_matrices,
                                              [[test_set_additional, file_name, img_resize]
-                                              for file_name in additional_files_name]):
+                                              for file_name in additional_files_name]),
+                                         total=len(additional_files_name)):
             x_test.append(img_array)
             x_test_filename.append(file_name)
 
