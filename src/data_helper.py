@@ -12,19 +12,21 @@ def get_jpeg_data_files_paths():
     """
     Returns the input file folders path
     
-    :return: The input file paths as list [train_jpeg_dir, test_jpeg_dir, train_csv_file]
+    :return: The input file paths as list [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
     """
 
     data_root_folder = os.path.abspath("../input/")
     train_jpeg_dir = os.path.join(data_root_folder, 'train-jpg')
     test_jpeg_dir = os.path.join(data_root_folder, 'test-jpg')
-    train_csv_file = os.path.join(data_root_folder, 'train.csv')
+    test_jpeg_additional = os.path.join(data_root_folder, 'test-jpg-additional')
+    train_csv_file = os.path.join(data_root_folder, 'train_v2.csv')
 
     assert os.path.exists(data_root_folder), "The {} folder does not exist".format(data_root_folder)
     assert os.path.exists(train_jpeg_dir), "The {} folder does not exist".format(train_jpeg_dir)
     assert os.path.exists(test_jpeg_dir), "The {} folder does not exist".format(test_jpeg_dir)
+    assert os.path.exists(train_csv_file), "The {} file does not exist".format(test_jpeg_additional)
     assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
-    return [train_jpeg_dir, test_jpeg_dir, train_csv_file]
+    return [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
 
 
 def _train_transform_to_matrices(file_path, tags, labels_map, img_resize):
@@ -68,26 +70,36 @@ def _get_train_matrices(train_set_folder, train_csv_file, scale_fct, img_resize)
     return [x_train, np.array(y_train, np.uint8), {v: k for k, v in labels_map.items()}]
 
 
-def _get_test_matrices(test_set_folder, img_resize):
+def _get_test_matrices(test_set_folder, test_set_additional, img_resize):
     x_test = []
     x_test_filename = []
     cpu_n = cpu_count()
     pool = Pool(cpu_n)
-    files_names = os.listdir(test_set_folder)
+    files_name = os.listdir(test_set_folder)
+    additional_files_name = os.listdir(test_set_additional)
     print("Transforming test data to matrices. Using {} threads...".format(cpu_n))
     sys.stdout.flush()
     for img_array, file_name in pool.starmap(_test_transform_to_matrices, ((test_set_folder, file_name, img_resize)
-                                                                           for file_name in files_names)):
+                                                                           for file_name in files_name)):
+        x_test.append(img_array)
+        x_test_filename.append(file_name)
+
+    print("Transforming additional test data to matrices. Using {} threads...".format(cpu_n))
+    sys.stdout.flush()
+    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ((test_set_additional, file_name, img_resize)
+                                                                           for file_name in additional_files_name)):
         x_test.append(img_array)
         x_test_filename.append(file_name)
     return [np.array(x_test, np.float32), np.array(x_test_filename)]
 
 
-def preprocess_data(train_set_folder, test_set_folder, train_csv_file, img_resize=(32, 32)):
+def preprocess_data(train_set_folder, test_set_folder, test_set_additional, train_csv_file, img_resize=(32, 32)):
     """
     Transform the images to ready to use data for CNN
     :param train_set_folder: the folder containing the images for training
     :param test_set_folder: the folder containing the images for testing
+    :param test_set_additional: the folder containing the images for additional testing (updated on 05/05/2017) 
+            https://www.kaggle.com/c/planet-understanding-the-amazon-from-space/discussion/32157
     :param train_csv_file: the file containing the labels of the training images
     :param img_resize: the standard size you want to have on images when transformed to matrices
     :return: The images matrices and labels as [x_train, x_test, y_train, labels_map, x_test_filename]
@@ -98,6 +110,6 @@ def preprocess_data(train_set_folder, test_set_folder, train_csv_file, img_resiz
         x_test_filename: The files name of each test images in the same order as the x_test arrays
     """
     x_train, y_train, labels_map = _get_train_matrices(train_set_folder, train_csv_file, lambda x: x / 255, img_resize)
-    x_test, x_test_filename = _get_test_matrices(test_set_folder, img_resize)
+    x_test, x_test_filename = _get_test_matrices(test_set_folder, test_set_additional, img_resize)
     print("Done.")
     return [x_train, x_test, y_train, labels_map, x_test_filename]
