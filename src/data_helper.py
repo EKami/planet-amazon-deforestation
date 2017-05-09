@@ -72,6 +72,7 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
                                        total=len(files_path)):
             x_train.append(img_array)
             y_train.append(targets)
+        pool.shutdown()
     return [x_train, y_train, {v: k for k, v in labels_map.items()}]
 
 
@@ -89,6 +90,7 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
                                          total=len(files_name)):
             x_test.append(img_array)
             x_test_filename.append(file_name)
+        pool.shutdown()
 
     print("Transforming additional test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
@@ -99,7 +101,7 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
                                          total=len(additional_files_name)):
             x_test.append(img_array)
             x_test_filename.append(file_name)
-
+        pool.shutdown()
     return [x_test, x_test_filename]
 
 
@@ -125,4 +127,4 @@ def preprocess_data(train_set_folder, test_set_folder,
     x_train, y_train, labels_map = _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_count)
     x_test, x_test_filename = _get_test_matrices(test_set_folder, test_set_additional, img_resize, process_count)
     print("Done.")
-    return [x_train, x_test, y_train, labels_map, x_test_filename]
+    return [np.array(x_train), np.array(x_test), np.array(y_train, dtype=np.uint8), labels_map, x_test_filename]
