@@ -33,7 +33,8 @@ def free_memory(pool):
     pool.join()
     gc.collect()
 
-def _train_transform_to_matrices(file_path, tags, labels_map, img_resize):
+def _train_transform_to_matrices(*args):
+    file_path, tags, labels_map, img_resize = args[0][0], args[0][1], args[0][2], args[0][3]
     img_array = np.array(cv2.resize(cv2.imread(file_path), img_resize), dtype=np.float32, copy=False)
     cv2.normalize(img_array, img_array, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
@@ -43,7 +44,8 @@ def _train_transform_to_matrices(file_path, tags, labels_map, img_resize):
     return img_array, targets
 
 
-def _test_transform_to_matrices(test_set_folder, file_name, img_resize):
+def _test_transform_to_matrices(*args):
+    test_set_folder, file_name, img_resize = args[0][0], args[0][1], args[0][2]
     img_array = np.array(cv2.resize(cv2.imread('{}/{}'.format(test_set_folder, file_name)), img_resize),
                          dtype=np.float32, copy=False)
     # Maybe remove this one
@@ -68,9 +70,9 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
     pool = Pool(process_count)
     print("Transforming train data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, targets in pool.starmap(_train_transform_to_matrices,
-                                           ((file_path, tag, labels_map, img_resize)
-                                            for file_path, tag in zip(files_path, tags_list))):
+    for img_array, targets in pool.imap(_train_transform_to_matrices,
+                                           [[file_path, tag, labels_map, img_resize]
+                                            for file_path, tag in zip(files_path, tags_list)]):
         x_train.append(img_array)
         y_train.append(targets)
     free_memory(pool)
@@ -85,8 +87,9 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
     additional_files_name = os.listdir(test_set_additional)
     print("Transforming test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ((test_set_folder, file_name, img_resize)
-                                                                           for file_name in files_name)):
+    for img_array, file_name in pool.imap(_test_transform_to_matrices,
+                                             [[test_set_folder, file_name, img_resize]
+                                              for file_name in files_name]):
         x_test.append(img_array)
         x_test_filename.append(file_name)
 
@@ -94,8 +97,9 @@ def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process
     pool = Pool(process_count)
     print("Transforming additional test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, file_name in pool.starmap(_test_transform_to_matrices, ((test_set_additional, file_name, img_resize)
-                                                                           for file_name in additional_files_name)):
+    for img_array, file_name in pool.imap(_test_transform_to_matrices,
+                                             [[test_set_additional, file_name, img_resize]
+                                              for file_name in additional_files_name]):
         x_test.append(img_array)
         x_test_filename.append(file_name)
 
@@ -114,8 +118,7 @@ def preprocess_data(train_set_folder, test_set_folder,
     :param train_csv_file: the file containing the labels of the training images
     :param img_resize: the standard size you want to have on images when transformed to matrices
     :param process_count: the number of process you want to use to preprocess the data.
-        The more you use, the faster it will be but depending on your RAM you may get a MemoryError.
-        If you do, lower this number. Its default value is equal to the number of core of your CPU
+        If you run into issues, lower this number. Its default value is equal to the number of core of your CPU
     :return: The images matrices and labels as [x_train, x_test, y_train, labels_map, x_test_filename]
         x_train: The X train values as a numpy array
         x_test: The X test values as a numpy array
