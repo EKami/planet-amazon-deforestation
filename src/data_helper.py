@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from itertools import chain
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
+from concurrent.futures import ThreadPoolExecutor
 
 def get_jpeg_data_files_paths():
     """
@@ -27,11 +28,6 @@ def get_jpeg_data_files_paths():
     assert os.path.exists(train_csv_file), "The {} file does not exist".format(test_jpeg_additional)
     assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
     return [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
-
-def free_memory(pool):
-    pool.close()
-    pool.join()
-    gc.collect()
 
 def _train_transform_to_matrices(*args):
     file_path, tags, labels_map, img_resize = args[0][0], args[0][1], args[0][2], args[0][3]
@@ -67,43 +63,40 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
     # Multiprocess transformation
     x_train = []
     y_train = []
-    pool = Pool(process_count)
     print("Transforming train data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, targets in pool.imap(_train_transform_to_matrices,
+    with ThreadPoolExecutor(process_count) as pool:
+        for img_array, targets in pool.map(_train_transform_to_matrices,
                                            [[file_path, tag, labels_map, img_resize]
                                             for file_path, tag in zip(files_path, tags_list)]):
-        x_train.append(img_array)
-        y_train.append(targets)
-    free_memory(pool)
+            x_train.append(img_array)
+            y_train.append(targets)
     return [np.array(x_train), np.array(y_train, np.uint8), {v: k for k, v in labels_map.items()}]
 
 
 def _get_test_matrices(test_set_folder, test_set_additional, img_resize, process_count):
     x_test = []
     x_test_filename = []
-    pool = Pool(process_count)
     files_name = os.listdir(test_set_folder)
     additional_files_name = os.listdir(test_set_additional)
     print("Transforming test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, file_name in pool.imap(_test_transform_to_matrices,
+    with ThreadPoolExecutor(process_count) as pool:
+        for img_array, file_name in pool.map(_test_transform_to_matrices,
                                              [[test_set_folder, file_name, img_resize]
                                               for file_name in files_name]):
-        x_test.append(img_array)
-        x_test_filename.append(file_name)
+            x_test.append(img_array)
+            x_test_filename.append(file_name)
 
-    free_memory(pool)
-    pool = Pool(process_count)
     print("Transforming additional test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
-    for img_array, file_name in pool.imap(_test_transform_to_matrices,
+    with ThreadPoolExecutor(process_count) as pool:
+        for img_array, file_name in pool.map(_test_transform_to_matrices,
                                              [[test_set_additional, file_name, img_resize]
                                               for file_name in additional_files_name]):
-        x_test.append(img_array)
-        x_test_filename.append(file_name)
+            x_test.append(img_array)
+            x_test_filename.append(file_name)
 
-    free_memory(pool)
     return [np.array(x_test, np.float32), np.array(x_test_filename)]
 
 
