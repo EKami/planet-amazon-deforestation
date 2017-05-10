@@ -31,7 +31,6 @@ class AmazonKerasClassifier:
 
     def add_conv_layer(self, img_size=(32, 32), img_channels=3):
         self.classifier.add(BatchNormalization(input_shape=(*img_size, img_channels)))
-        self.classifier.add(Conv2D(8, (1, 1), activation='relu'))
         self.classifier.add(Conv2D(16, (2, 2), activation='relu'))
         self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
         self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
@@ -45,9 +44,9 @@ class AmazonKerasClassifier:
         self.classifier.add(Flatten())
 
     def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(128, activation='relu'))
-        self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(256, activation='relu'))
+        self.classifier.add(Dropout(0.5))
+        self.classifier.add(Dense(512, activation='relu'))
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
 
