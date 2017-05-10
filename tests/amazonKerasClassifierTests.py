@@ -17,7 +17,7 @@ class TestAmazonKerasClassifier:
     Checks that the preprocessed data have the right shape
     """
     def test_data_preprocess(self):
-        img_resize = (64, 64)
+        img_resize = (16, 16)
         color_channels = 3  # RGB
         train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file = data_helper.get_jpeg_data_files_paths()
         x_train, x_test, y_train, y_map, x_test_filename = data_helper.preprocess_data(train_jpeg_dir, test_jpeg_dir,

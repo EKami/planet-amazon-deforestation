@@ -8,6 +8,7 @@ import tensorflow.contrib.keras.api.keras as k
 from tensorflow.contrib.keras.api.keras.models import Sequential
 from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten
 from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D, BatchNormalization
+from tensorflow.contrib.keras.api.keras.optimizers import Adam
 from tensorflow.contrib.keras.api.keras.callbacks import Callback
 from tensorflow.contrib.keras import backend
 
@@ -59,7 +60,6 @@ class AmazonKerasClassifier:
 
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
-
         self.classifier.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
         self.classifier.fit(X_train, y_train,
