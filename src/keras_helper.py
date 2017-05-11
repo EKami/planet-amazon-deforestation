@@ -31,12 +31,13 @@ class AmazonKerasClassifier:
 
     def add_conv_layer(self, img_size=(32, 32), img_channels=3):
         self.classifier.add(BatchNormalization(input_shape=(*img_size, img_channels)))
-        self.classifier.add(Conv2D(16, (2, 2), activation='relu'))
-        self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
         self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
         self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
         self.classifier.add(Dropout(0.25))
         self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
+        self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
+        self.classifier.add(Dropout(0.25))
+        self.classifier.add(Conv2D(16, (2, 2), activation='relu'))
         self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
         self.classifier.add(Dropout(0.25))
 
