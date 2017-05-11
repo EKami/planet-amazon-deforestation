@@ -65,7 +65,7 @@ class AmazonKerasClassifier:
         self.classifier.fit(X_train, y_train,
                             batch_size=batch_size,
                             epochs=epoch,
-                            verbose=0,
+                            verbose=1,
                             validation_data=(X_valid, y_valid),
                             callbacks=[history, *train_callbacks])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
