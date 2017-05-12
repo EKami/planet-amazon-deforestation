@@ -44,12 +44,14 @@ class AmazonKerasClassifier:
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
 
+
     def add_ann_layer(self, output_size):
         self.classifier.add(Dense(256, activation='relu'))
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(512, activation='relu'))
         self.classifier.add(Dropout(0.5))
-        self.classifier.add(Dense(output_size, activation='sigmoid'))
+        self.classifier.add(Dense(output_size, activation='softmax'))
+
 
     def _get_fbeta_score(self, classifier, X_valid, y_valid):
         p_valid = classifier.predict(X_valid)
@@ -60,7 +62,7 @@ class AmazonKerasClassifier:
 
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
-        self.classifier.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        self.classifier.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
         self.classifier.fit(X_train, y_train,
                             batch_size=batch_size,
@@ -79,7 +81,7 @@ class AmazonKerasClassifier:
         """
         Return the predictions mapped to their labels
         :param predictions: the predictions from the predict() method
-        :param labels_map: the map 
+        :param labels_map: the map
         :param thresholds: The threshold of each class to be considered as existing or not existing
         :return: the predictions list mapped to their labels
         """
@@ -92,4 +94,3 @@ class AmazonKerasClassifier:
 
     def close(self):
         backend.clear_session()
-
