@@ -50,8 +50,7 @@ class AmazonKerasClassifier:
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(512, activation='relu'))
         self.classifier.add(Dropout(0.5))
-        self.classifier.add(Dense(output_size, activation='softmax'))
-
+        self.classifier.add(Dense(output_size, activation='sigmoid'))
 
     def _get_fbeta_score(self, classifier, X_valid, y_valid):
         p_valid = classifier.predict(X_valid)
@@ -62,7 +61,18 @@ class AmazonKerasClassifier:
 
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
-        self.classifier.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        self.classifier.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+
+        # early stopping will auto-stop training process if model stops learning after 2 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=2, verbose=0, mode='auto')
+
+        # checkpoint for saving best model weights, rather than using the score in the last epoch which isn't necessarily the best score
+        # we can load those best weights for test prediction with: model.load_weights("weights.best.hdf5")
+        
+        filepath="weights.best.hdf5"
+        checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+        callbacks_list = [checkpoint, history, *train_callbacks, earlyStopping]
 
         self.classifier.fit(X_train, y_train,
                             batch_size=batch_size,
