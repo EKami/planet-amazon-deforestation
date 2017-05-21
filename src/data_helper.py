@@ -1,13 +1,14 @@
 import os
 import sys
-import cv2
 import gc
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from PIL import Image
 from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
+
 
 def get_jpeg_data_files_paths():
     """
@@ -29,10 +30,16 @@ def get_jpeg_data_files_paths():
     assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
     return [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
 
+
 def _train_transform_to_matrices(*args):
     file_path, tags, labels_map, img_resize = args[0][0], args[0][1], args[0][2], args[0][3]
-    img_array = np.array(cv2.resize(cv2.imread(file_path), img_resize), dtype=np.float32)
-    cv2.normalize(img_array, img_array, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    img = Image.open(file_path)
+    img.thumbnail(img_resize)
+
+    # Augment the image `img` here
+
+    # Convert to RGB and normalize
+    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
 
     targets = np.zeros(len(labels_map))
     for t in tags.split(' '):
@@ -42,9 +49,13 @@ def _train_transform_to_matrices(*args):
 
 def _test_transform_to_matrices(*args):
     test_set_folder, file_name, img_resize = args[0][0], args[0][1], args[0][2]
-    img_array = np.array(cv2.resize(cv2.imread('{}/{}'.format(test_set_folder, file_name)), img_resize),
-                         dtype=np.float32)
-    cv2.normalize(img_array, img_array, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    img = Image.open('{}/{}'.format(test_set_folder, file_name))
+    img.thumbnail(img_resize)
+
+    # Augment the image `img` here
+
+    # Convert to RGB and normalize
+    img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
     return [img_array, file_name]
 
 
@@ -62,8 +73,6 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
     # Multiprocess transformation
     x_train = []
     y_train = []
-    print("Transforming train data to matrices. Using {} threads...".format(process_count))
-    sys.stdout.flush()
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, targets in tqdm(pool.map(_train_transform_to_matrices,
                                                 [[file_path, tag, labels_map, img_resize]
@@ -107,6 +116,7 @@ def preprocess_train_data(train_set_folder, train_csv_file, img_resize=(32, 32),
     print("Done. Size consumed by arrays {} mb".format((ret[0].nbytes + ret[1].nbytes) / 1024 / 1024))
     return ret
 
+
 def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu_count()):
     """
     Transform the images to ready to use data for the CNN
@@ -122,6 +132,7 @@ def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu
     ret = [np.array(x_test), x_test_filename]
     print("Done. Size consumed by arrays {} mb".format(ret[0].nbytes / 1024 / 1024))
     return ret
+
 
 def preprocess_data(train_set_folder, test_set_folder,
                     test_set_additional, train_csv_file, img_resize=(32, 32), process_count=cpu_count()):
@@ -142,11 +153,13 @@ def preprocess_data(train_set_folder, test_set_folder,
         labels_map: The mapping between the tags labels and their indices
         x_test_filename: The files name of each test images in the same order as the x_test arrays
     """
+    print("Transforming and augmenting train data to matrices. Using {} threads...".format(process_count))
+    sys.stdout.flush()
     x_train, y_train, labels_map = _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_count)
-    print("Transforming test data to matrices. Using {} threads...".format(process_count))
+    print("Transforming and augmenting test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
     x_test, x_test_filename = _get_test_matrices(test_set_folder, img_resize, process_count)
-    print("Transforming additional test data to matrices. Using {} threads...".format(process_count))
+    print("Transforming and augmenting additional test data to matrices. Using {} threads...".format(process_count))
     sys.stdout.flush()
     x_test_add, x_test_filename_add = _get_test_matrices(test_set_additional, img_resize, process_count)
     x_test = np.vstack((x_test, x_test_add))
