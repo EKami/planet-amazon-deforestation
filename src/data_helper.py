@@ -45,7 +45,7 @@ def _train_transform_to_matrices(*args):
             A 17 length vector
     """
     # Unpack the *args
-    file_path, tags, labels_map, img_resize = args[0][0], args[0][1], args[0][2], args[0][3]
+    file_path, tags, labels_map, img_resize = list(args[0])
     img = Image.open(file_path)
     img.thumbnail(img_resize)  # Resize the image
 
@@ -75,7 +75,7 @@ def _test_transform_to_matrices(*args):
             file_name: string
                 The name of the test image
         """
-    test_set_folder, file_name, img_resize = args[0][0], args[0][1], args[0][2]
+    test_set_folder, file_name, img_resize = list(args[0])
     img = Image.open('{}/{}'.format(test_set_folder, file_name))
     img.thumbnail(img_resize)
 
@@ -124,7 +124,7 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
     # the x_train and y_train lists
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, targets in tqdm(pool.map(_train_transform_to_matrices,
-                                                [[file_path, tag, labels_map, img_resize]
+                                                [(file_path, tag, labels_map, img_resize)
                                                  for file_path, tag in zip(files_path, tags_list)]),
                                        total=len(files_path)):
             x_train.append(img_array)
@@ -143,7 +143,7 @@ def _get_test_matrices(test_set_folder, img_resize, process_count):
     # the x_test and x_test_filename lists
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, file_name in tqdm(pool.map(_test_transform_to_matrices,
-                                                  [[test_set_folder, file_name, img_resize]
+                                                  [(test_set_folder, file_name, img_resize)
                                                    for file_name in files_name]),
                                          total=len(files_name)):
             x_test.append(img_array)
