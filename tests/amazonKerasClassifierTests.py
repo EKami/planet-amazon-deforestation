@@ -8,7 +8,6 @@ from itertools import chain
 sys.path.append('../src')
 sys.path.append('../tests')
 import data_helper
-from keras_helper import AmazonKerasClassifier
 
 
 class TestAmazonKerasClassifier:
@@ -20,6 +19,12 @@ class TestAmazonKerasClassifier:
         img_resize = (16, 16)
         color_channels = 3  # RGB
         train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file = data_helper.get_jpeg_data_files_paths()
+
+        assert os.path.exists(train_jpeg_dir), "The {} folder does not exist".format(train_jpeg_dir)
+        assert os.path.exists(test_jpeg_dir), "The {} folder does not exist".format(test_jpeg_dir)
+        assert os.path.exists(train_csv_file), "The {} file does not exist".format(test_jpeg_additional)
+        assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
+
         x_train, x_test, y_train, y_map, x_test_filename = data_helper.preprocess_data(train_jpeg_dir, test_jpeg_dir,
                                                                                        test_jpeg_additional,
                                                                                        train_csv_file, img_resize)

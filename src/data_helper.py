@@ -22,12 +22,6 @@ def get_jpeg_data_files_paths():
     test_jpeg_dir = os.path.join(data_root_folder, 'test-jpg')
     test_jpeg_additional = os.path.join(data_root_folder, 'test-jpg-additional')
     train_csv_file = os.path.join(data_root_folder, 'train_v2.csv')
-
-    assert os.path.exists(data_root_folder), "The {} folder does not exist".format(data_root_folder)
-    assert os.path.exists(train_jpeg_dir), "The {} folder does not exist".format(train_jpeg_dir)
-    assert os.path.exists(test_jpeg_dir), "The {} folder does not exist".format(test_jpeg_dir)
-    assert os.path.exists(train_csv_file), "The {} file does not exist".format(test_jpeg_additional)
-    assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
     return [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
 
 
