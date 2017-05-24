@@ -14,7 +14,8 @@ def get_jpeg_data_files_paths():
     """
     Returns the input file folders path
     
-    :return: The input file paths as list [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
+    :return: list of strings
+        The input file paths as list [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
     """
 
     data_root_folder = os.path.abspath("../input/")
@@ -26,9 +27,27 @@ def get_jpeg_data_files_paths():
 
 
 def _train_transform_to_matrices(*args):
-    file_path, tags, labels_map, img_resize = args[0][0], args[0][1], args[0][2], args[0][3]
+    """
+    
+    :param args: list of arguments
+        file_path: string
+            The path of the image
+        tags: list of strings
+            The associated tags
+        labels_map: dict {int: string}
+            The map between the image label and their id 
+        img_resize: tuple (int, int)
+            The resize size of the original image given by the file_path argument
+    :return: img_array, targets
+        img_array: Numpy array
+            The image from the file_path as a numpy array resized with img_resize
+        targets: Numpy array
+            A 17 length vector
+    """
+    # Unpack the *args
+    file_path, tags, labels_map, img_resize = list(args[0])
     img = Image.open(file_path)
-    img.thumbnail(img_resize)
+    img.thumbnail(img_resize)  # Resize the image
 
     # Augment the image `img` here
 
@@ -42,7 +61,21 @@ def _train_transform_to_matrices(*args):
 
 
 def _test_transform_to_matrices(*args):
-    test_set_folder, file_name, img_resize = args[0][0], args[0][1], args[0][2]
+    """
+    :param args: list of arguments
+        test_set_folder: string
+            The path of the all the test images
+        file_name: string
+            The name of the test image
+        img_resize: tuple (int, int)
+            The resize size of the original image given by the file_path argument
+        :return: img_array, file_name
+            img_array: Numpy array
+                The image from the file_path as a numpy array resized with img_resize
+            file_name: string
+                The name of the test image
+        """
+    test_set_folder, file_name, img_resize = list(args[0])
     img = Image.open('{}/{}'.format(test_set_folder, file_name))
     img.thumbnail(img_resize)
 
@@ -50,10 +83,29 @@ def _test_transform_to_matrices(*args):
 
     # Convert to RGB and normalize
     img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
-    return [img_array, file_name]
+    return img_array, file_name
 
 
 def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_count):
+    """
+    
+    :param train_set_folder: string
+        The path of the all the train images
+    :param train_csv_file: string
+        The path of the csv file labels
+    :param img_resize: tuple (int, int)
+        The resize size of the original image given by the file_path argument
+    :param process_count: int
+        The number of threads you want to spawn to transform raw images to numpy
+        matrices
+    :return: x_train, y_train, labels_map
+        x_train: list of float matrices
+            The list of all the images stored as numpy matrices
+        y_train: list of list of int
+            A list containing vectors of 17 length long ints
+        labels_map: dict {string: int}
+            Inverted mapping of labels/id
+    """
     labels_df = pd.read_csv(train_csv_file)
     labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
     labels_map = {l: i for i, l in enumerate(labels)}
@@ -64,12 +116,15 @@ def _get_train_matrices(train_set_folder, train_csv_file, img_resize, process_co
         files_path.append('{}/{}.jpg'.format(train_set_folder, file_name))
         tags_list.append(tags)
 
-    # Multiprocess transformation
     x_train = []
     y_train = []
+    # Multiprocess transformation, the map() function take a function as a 1st argument
+    # and the argument to pass to it as the 2nd argument. These arguments are processed
+    # asynchronously on threads defined by process_count and their results are stored in
+    # the x_train and y_train lists
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, targets in tqdm(pool.map(_train_transform_to_matrices,
-                                                [[file_path, tag, labels_map, img_resize]
+                                                [(file_path, tag, labels_map, img_resize)
                                                  for file_path, tag in zip(files_path, tags_list)]),
                                        total=len(files_path)):
             x_train.append(img_array)
@@ -82,10 +137,14 @@ def _get_test_matrices(test_set_folder, img_resize, process_count):
     x_test_filename = []
     files_name = os.listdir(test_set_folder)
 
+    # Multiprocess transformation, the map() function take a function as a 1st argument
+    # and the argument to pass to it as the 2nd argument. These arguments are processed
+    # asynchronously on threads defined by process_count and their results are stored in
+    # the x_test and x_test_filename lists
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, file_name in tqdm(pool.map(_test_transform_to_matrices,
-                                             [[test_set_folder, file_name, img_resize]
-                                              for file_name in files_name]),
+                                                  [(test_set_folder, file_name, img_resize)
+                                                   for file_name in files_name]),
                                          total=len(files_name)):
             x_test.append(img_array)
             x_test_filename.append(file_name)
