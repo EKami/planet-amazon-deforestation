@@ -31,24 +31,35 @@ class AmazonKerasClassifier:
 
     def add_conv_layer(self, img_size=(32, 32), img_channels=3):
         self.classifier.add(BatchNormalization(input_shape=(*img_size, img_channels)))
+
+        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu'))
         self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
-        self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
+        self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
+
+        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
         self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
-        self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
+        self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        self.classifier.add(Conv2D(16, (2, 2), activation='relu'))
-        self.classifier.add(MaxPooling2D(pool_size=(2, 2)))
+
+        self.classifier.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
+        self.classifier.add(Conv2D(128, (3, 3), activation='relu'))
+        self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
+
+        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
+        self.classifier.add(Conv2D(256, (3, 3), activation='relu'))
+        self.classifier.add(MaxPooling2D(pool_size=2))
+        self.classifier.add(Dropout(0.25))
+
 
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
 
 
     def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(256, activation='relu'))
-        self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(512, activation='relu'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
 
@@ -56,25 +67,34 @@ class AmazonKerasClassifier:
         p_valid = classifier.predict(X_valid)
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
-    def train_model(self, x_train, y_train, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+    def train_model(self, x_train, y_train, learn_rate=0.001, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
         history = LossHistory()
 
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
-        self.classifier.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+        opt = Adam(lr=learn_rate)
+
+        self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
 
-        # early stopping will auto-stop training process if model stops learning after 2 epochs
-        earlyStopping = EarlyStopping(monitor='val_loss', patience=2, verbose=0, mode='auto')
+        # early stopping will auto-stop training process if model stops learning after 3 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
 
         self.classifier.fit(X_train, y_train,
                             batch_size=batch_size,
                             epochs=epoch,
                             verbose=1,
                             validation_data=(X_valid, y_valid),
-                            callbacks=[history, *train_callbacks])
+                            callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
+
+    def save_weights(self, weight_file_path):
+        self.classifier.save_weights(weight_file_path)
+
+    def load_weights(self, weight_file_path):
+        self.classifier.load_weights(weight_file_path)
 
     def predict(self, x_test):
         predictions = self.classifier.predict(x_test)
