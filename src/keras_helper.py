@@ -9,7 +9,7 @@ from tensorflow.contrib.keras.api.keras.models import Sequential
 from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten
 from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D, BatchNormalization
 from tensorflow.contrib.keras.api.keras.optimizers import Adam
-from tensorflow.contrib.keras.api.keras.callbacks import Callback
+from tensorflow.contrib.keras.api.keras.callbacks import Callback, EarlyStopping
 from tensorflow.contrib.keras import backend
 
 
