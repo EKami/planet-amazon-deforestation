@@ -168,8 +168,6 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 img_resize = (64, 64) # The resize size of each image
 validation_split_size = 0.2
-epochs = 20
-learn_rate = 0.001
 batch_size = 128
 
 # <markdowncell>
@@ -212,11 +210,19 @@ y_map
 from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 filepath="weights.best.hdf5"
-checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
 
 # <markdowncell>
 
-# ## Create the neural network definition
+# ## Define and Train model
+
+# <markdowncell>
+
+# Here we define the model and begin training. 
+# 
+# Before starting the training process, you should first set a learning rate annealing optimization schedule by choosing a series of learning rates (learn_rates) with corresponding number of epochs for each (epochs_arr).
+# 
+# Alternatively, if you just want to run one training session at a fixed learning rate and num epochs you can just input one entry for each of these. 
 
 # <codecell>
 
@@ -224,27 +230,20 @@ classifier = AmazonKerasClassifier()
 classifier.add_conv_layer(img_resize)
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
-train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, batch_size, 
-                                                               validation_split_size=validation_split_size, 
-                                                               train_callbacks=[checkpoint])
+
+train_losses, val_losses = [], []
+epochs_arr = [20, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
+                                                                           batch_size, validation_split_size=validation_split_size, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses.append(tmp_train_losses)
+    val_losses.append(tmp_val_losses)
 
 # <markdowncell>
 
-# ## Continue Training
-
-# <markdowncell>
-
-# Here you can continue training the model for additional epochs with the option to adjust the learning rate.
-# 
-# If you are finished training you can skip this step.
-
-# <codecell>
-
-epochs = 5
-learn_rate = 0.001
-train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, batch_size, 
-                                                               validation_split_size=validation_split_size, 
-                                                               train_callbacks=[checkpoint])
+# ## Load Best Weights
 
 # <markdowncell>
 
