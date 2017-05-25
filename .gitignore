@@ -1,6 +1,7 @@
 # Data stuff
 input/*
 submission_file.csv
+notebooks/amazon_forest_notebook.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
