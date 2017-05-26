@@ -161,14 +161,12 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Define hyperparameters
-# Define the hyperparameters of our neural network
+# # Image Resize
+# Define the dimensions of the image data trained by the network. Due to memory constraints we can't load in the full size 256x256 jpg images. Recommended resized images could be 32x32, 64x64, or 128x128.
 
 # <codecell>
 
 img_resize = (64, 64) # The resize size of each image
-validation_split_size = 0.2
-batch_size = 128
 
 # <markdowncell>
 
@@ -200,9 +198,7 @@ y_map
 # <markdowncell>
 
 # ## Create a checkpoint
-
-# <markdowncell>
-
+# 
 # Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
 # <codecell>
@@ -214,15 +210,32 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <markdowncell>
 
+# ## Choose Hyperparameters
+# 
+# Choose your hyperparameters below for training. 
+# 
+# If you'd like to create a learning rate annealing schedule you can set a series of learning rates with `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. 
+# 
+# Alternatively, if you just want to run one training session at a fixed learning rate and num epochs you can just enter values for `lr_1` and `epochs_2` only.
+
+# <codecell>
+
+validation_split_size = 0.2
+batch_size = 128
+lr_1 = 0.001
+lr_2 = 0.0001
+lr_3 = 0.00001
+epochs_1 = 10
+epochs_2 = 5
+epochs_3 = 5
+
+# <markdowncell>
+
 # ## Define and Train model
 
 # <markdowncell>
 
-# Here we define the model and begin training. 
-# 
-# Before starting the training process, you should first set a learning rate annealing optimization schedule by choosing a series of learning rates (learn_rates) with corresponding number of epochs for each (epochs_arr).
-# 
-# Alternatively, if you just want to run one training session at a fixed learning rate and num epochs you can just input one entry for each of these. 
+# Here we define the model and begin training.
 
 # <codecell>
 
@@ -232,14 +245,14 @@ classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
 
 train_losses, val_losses = [], []
-epochs_arr = [20, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
+epochs_arr = [epochs_1, epochs_2, epochs_3]
+learn_rates = [lr_1, lr_2, lr_3]
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
                                                                            batch_size, validation_split_size=validation_split_size, 
                                                                            train_callbacks=[checkpoint])
-    train_losses.append(tmp_train_losses)
-    val_losses.append(tmp_val_losses)
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
 
 # <markdowncell>
 
