@@ -47,11 +47,6 @@ class AmazonKerasClassifier:
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(256, (3, 3), activation='relu'))
-        self.classifier.add(MaxPooling2D(pool_size=2))
-        self.classifier.add(Dropout(0.25))
-
 
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
@@ -82,6 +77,31 @@ class AmazonKerasClassifier:
         earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
 
         self.classifier.fit(X_train, y_train,
+                            batch_size=batch_size,
+                            epochs=epoch,
+                            verbose=1,
+                            validation_data=(X_valid, y_valid),
+                            callbacks=[history, *train_callbacks, earlyStopping])
+        fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
+        return [history.train_losses, history.val_losses, fbeta_score]
+    
+    def train_model_pseudo(self, comb_feat, comb_pseudo, learn_rate=0.002, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+        history = LossHistory()
+
+        X_train, X_valid, y_train, y_valid = train_test_split(comb_feat, comb_pseudo,
+                                                              test_size=validation_split_size)
+
+        opt = Adam(lr=learn_rate)
+
+        self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+
+        # early stopping will auto-stop training process if model stops learning after 2 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=4, verbose=0, mode='auto')
+
+
+        #Pseudo Labeling
+        self.classifier.fit(comb_feat, comb_pseudo,
                             batch_size=batch_size,
                             epochs=epoch,
                             verbose=1,
