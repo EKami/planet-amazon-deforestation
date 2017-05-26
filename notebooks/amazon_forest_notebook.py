@@ -214,9 +214,7 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # 
 # Choose your hyperparameters below for training. 
 # 
-# If you'd like to create a learning rate annealing schedule you can set a series of learning rates with `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. 
-# 
-# Alternatively, if you just want to run one training session at a fixed learning rate and num epochs you can just enter values for `lr_1` and `epochs_2` only.
+# We have assigned a series of learning rate values to create an optimized annealing schedule `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. Feel free to change these values or you can just use the defaults we have filled in. 
 
 # <codecell>
 
