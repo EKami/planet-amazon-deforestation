@@ -213,27 +213,19 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # ## Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training. 
-# 
-# We have assigned a series of learning rate values to create an optimized annealing schedule `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. Feel free to change these values or you can just use the defaults we have filled in. 
 
 # <codecell>
 
 validation_split_size = 0.2
 batch_size = 128
-lr_1 = 0.001
-lr_2 = 0.0001
-lr_3 = 0.00001
-epochs_1 = 10
-epochs_2 = 5
-epochs_3 = 5
 
 # <markdowncell>
 
 # ## Define and Train model
-
-# <markdowncell>
-
-# Here we define the model and begin training.
+# 
+# Here we define the model and begin training. 
+# 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
@@ -243,8 +235,8 @@ classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
 
 train_losses, val_losses = [], []
-epochs_arr = [epochs_1, epochs_2, epochs_3]
-learn_rates = [lr_1, lr_2, lr_3]
+epochs_arr = [10, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
                                                                            batch_size, validation_split_size=validation_split_size, 
