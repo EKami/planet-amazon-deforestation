@@ -161,15 +161,12 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Define hyperparameters
-# Define the hyperparameters of our neural network
+# # Image Resize
+# Define the dimensions of the image data trained by the network. Due to memory constraints we can't load in the full size 256x256 jpg images. Recommended resized images could be 32x32, 64x64, or 128x128.
 
 # <codecell>
 
 img_resize = (64, 64) # The resize size of each image
-validation_split_size = 0.2
-epochs = 20
-batch_size = 128
 
 # <markdowncell>
 
@@ -201,21 +198,34 @@ y_map
 # <markdowncell>
 
 # ## Create a checkpoint
-
-# <markdowncell>
-
+# 
 # Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
 # <codecell>
 
-from keras.callbacks import ModelCheckpoint
+from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 filepath="weights.best.hdf5"
-checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
 
 # <markdowncell>
 
-# ## Create the neural network definition
+# ## Choose Hyperparameters
+# 
+# Choose your hyperparameters below for training. 
+
+# <codecell>
+
+validation_split_size = 0.2
+batch_size = 128
+
+# <markdowncell>
+
+# ## Define and Train model
+# 
+# Here we define the model and begin training. 
+# 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
@@ -223,17 +233,29 @@ classifier = AmazonKerasClassifier()
 classifier.add_conv_layer(img_resize)
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
-train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, epochs, batch_size, validation_split_size=validation_split_size)
+
+train_losses, val_losses = [], []
+epochs_arr = [10, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
+                                                                           batch_size, validation_split_size=validation_split_size, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
 
 # <markdowncell>
 
 # ## Load Best Weights
 
+# <markdowncell>
+
+# Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
+
 # <codecell>
 
-# TODO finish
-#classifier.load_weights("weights.best.hdf5")
-#print("Weights loaded")
+classifier.load_weights("weights.best.hdf5")
+print("Weights loaded")
 
 # <markdowncell>
 

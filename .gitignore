@@ -2,6 +2,7 @@
 input/*
 submission_file.csv
 notebooks/amazon_forest_notebook.ipynb
+notebooks/weights.best.hdf5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
