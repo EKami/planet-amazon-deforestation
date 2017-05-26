@@ -225,7 +225,7 @@ batch_size = 128
 # 
 # Here we define the model and begin training. 
 # 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined `lr_1, lr_2, lr_3` and corresponding number of epochs for each `epochs_1, epochs_2, epochs_3`. Feel free to change these values if you like or just use the defaults. 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
