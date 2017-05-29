@@ -26,7 +26,7 @@ sys.path.append('../tests')
 
 # <markdowncell>
 
-# ## Import required modules
+# ### Import required modules
 
 # <codecell>
 
@@ -56,7 +56,7 @@ tf.__version__
 
 # <markdowncell>
 
-# ## Download the competition files
+# ### Download the competition files
 # Download the dataset files and extract them automatically with the help of [Kaggle data downloader](https://github.com/EKami/kaggle-data-downloader)
 
 # <codecell>
@@ -107,7 +107,7 @@ else:
 
 # <markdowncell>
 
-# ## Inspect image labels
+# ### Inspect image labels
 # Visualize what the training set looks like
 
 # <codecell>
@@ -141,7 +141,7 @@ sns.barplot(x=labels_s, y=labels_s.index, orient='h')
 
 # <markdowncell>
 
-# ## Images
+# ### Images
 # Visualize some chip images to know what we are dealing with.
 # Lets vizualise 1 chip for the 17 images to get a sense of their differences.
 
@@ -161,7 +161,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Image Resize
+# ### Image Resize
 # Define the dimensions of the image data trained by the network. Due to memory constraints we can't load in the full size 256x256 jpg images. Recommended resized images could be 32x32, 64x64, or 128x128.
 
 # <codecell>
@@ -170,7 +170,7 @@ img_resize = (64, 64) # The resize size of each image
 
 # <markdowncell>
 
-# # Data preprocessing
+# ### Data preprocessing
 # Preprocess the data in order to fit it into the Keras model.
 # 
 # Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
@@ -197,7 +197,38 @@ y_map
 
 # <markdowncell>
 
-# ## Create a checkpoint
+# ## Part 1: Weather labels
+
+# <markdowncell>
+
+# ### Choose Hyperparameters
+# 
+# Choose your hyperparameters below for training.
+
+# <codecell>
+
+# TODO
+
+# <markdowncell>
+
+# ### Define and Train model for the weather labels
+# 
+# Here we'll create a model with a softmax classifier as output on the weather labels (**only one weather** label can be present) for one prediction.
+
+# <codecell>
+
+# TODO
+weather_classifier = AmazonKerasClassifier()
+
+weather_classifier.close()
+
+# <markdowncell>
+
+# ## Part 2: Lands labels
+
+# <markdowncell>
+
+# ### Create a checkpoint
 # 
 # Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
@@ -210,35 +241,35 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <markdowncell>
 
-# ## Choose Hyperparameters
+# ### Choose Hyperparameters
 # 
-# Choose your hyperparameters below for training. 
-
-# <codecell>
-
-validation_split_size = 0.2
-batch_size = 128
-
-# <markdowncell>
-
-# ## Define and Train model
-# 
-# Here we define the model and begin training. 
+# Choose your hyperparameters below for training.
 # 
 # Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
-classifier = AmazonKerasClassifier()
-classifier.add_conv_layer(img_resize)
-classifier.add_flatten_layer()
-classifier.add_ann_layer(len(y_map))
-
-train_losses, val_losses = [], []
+validation_split_size = 0.2
+batch_size = 128
 epochs_arr = [10, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
+
+# <markdowncell>
+
+# ### Define and Train model
+# 
+# Here we define another model with a sigmoid output (**one or more** land labels can be present) and begin training. 
+
+# <codecell>
+
+lands_classifier = AmazonKerasClassifier()
+lands_classifier.add_conv_layer(img_resize)
+lands_classifier.add_flatten_layer()
+lands_classifier.add_ann_layer(len(y_map))
+
+train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = lands_classifier.train_model(x_train, y_train, learn_rate, epochs, 
                                                                            batch_size, validation_split_size=validation_split_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
@@ -246,7 +277,7 @@ for learn_rate, epochs in zip(learn_rates, epochs_arr):
 
 # <markdowncell>
 
-# ## Load Best Weights
+# ### Load Best Weights
 
 # <markdowncell>
 
@@ -254,12 +285,12 @@ for learn_rate, epochs in zip(learn_rates, epochs_arr):
 
 # <codecell>
 
-classifier.load_weights("weights.best.hdf5")
+lands_classifier.load_weights("weights.best.hdf5")
 print("Weights loaded")
 
 # <markdowncell>
 
-# ## Monitor the results
+# ### Monitor the results
 
 # <markdowncell>
 
@@ -290,7 +321,7 @@ gc.collect()
 
 x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
 # Predict the labels of our x_test images
-predictions = classifier.predict(x_test)
+predictions = lands_classifier.predict(x_test)
 
 # <markdowncell>
 
@@ -302,7 +333,7 @@ del x_test
 gc.collect()
 
 x_test, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
-new_predictions = classifier.predict(x_test)
+new_predictions = lands_classifier.predict(x_test)
 
 del x_test
 gc.collect()
@@ -337,7 +368,7 @@ for i, tag_vals in enumerate(tags_pred):
 
 # <codecell>
 
-predicted_labels = classifier.map_predictions(predictions, y_map, thresholds)
+predicted_labels = lands_classifier.map_predictions(predictions, y_map, thresholds)
 
 # <markdowncell>
 
@@ -373,7 +404,7 @@ sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 # <codecell>
 
 final_df.to_csv('../submission_file.csv', index=False)
-classifier.close()
+lands_classifier.close()
 
 # <markdowncell>
 
