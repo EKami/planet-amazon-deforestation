@@ -25,8 +25,8 @@ class TestAmazonKerasClassifier:
         assert os.path.exists(test_jpeg_additional), "The {} file does not exist".format(test_jpeg_additional)
         assert os.path.exists(train_csv_file), "The {} file does not exist".format(train_csv_file)
 
-        x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file,
-                                                                    img_resize=img_resize)
+        x_train, y_train, file_names, y_map = data_helper.preprocess_train_data(train_jpeg_dir,
+                                                                                train_csv_file, img_resize=img_resize)
 
         x_test, _ = data_helper.preprocess_test_data(test_jpeg_dir, img_resize=img_resize)
         x_test_add, _ = data_helper.preprocess_test_data(test_jpeg_additional, img_resize=img_resize)
