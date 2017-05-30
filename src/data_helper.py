@@ -57,7 +57,8 @@ def _train_transform_to_matrices(*args):
 
     targets = np.zeros(len(labels_map))
     for t in tags.split(' '):
-        targets[labels_map[t]] = 1
+        if t in labels_map.values():
+            targets[labels_map[t]] = 1
     return img_array, targets, file_name
 
 
@@ -150,7 +151,7 @@ def _get_test_matrices(test_set_folder, img_resize, process_count):
     return [x_test, x_test_filename]
 
 
-def preprocess_train_data(train_set_folder, train_csv_file, filter='all',
+def preprocess_train_data(train_set_folder, train_csv_file, label_filter='all',
                           img_resize=(32, 32), process_count=cpu_count()):
     """
     Transform the train images to ready to use data for the CNN 
@@ -158,7 +159,7 @@ def preprocess_train_data(train_set_folder, train_csv_file, filter='all',
         The folder containing the images for training
     :param train_csv_file: string
         The file containing the labels of the training images
-    :param filter: string
+    :param label_filter: string
         either:
             - 'all' to preprocess all the images
             - 'weather' to preprocess only the weather data
@@ -179,16 +180,23 @@ def preprocess_train_data(train_set_folder, train_csv_file, filter='all',
             The mapping between the tags labels and their indices
     """
     labels_df = pd.read_csv(train_csv_file)
-    labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
-    labels_map = {l: i for i, l in enumerate(labels)}
-    x_train, y_train, files_name = [], [], []
-    if filter == 'weather':
-        pass
-    elif filter == 'land':
-        pass
+
+    weather_list = ['clear', 'partly_cloudy', 'cloudy', 'haze']
+    if label_filter == 'weather':
+        labels_df = labels_df[labels_df['tags'].str.contains('|'.join(weather_list))]
+        labels_map = {l: i for i, l in enumerate(weather_list)}
+        print(labels_map)
+    elif label_filter == 'land':
+        labels = set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values]))
+        labels = sorted([label for label in labels if label not in weather_list])
+        labels_map = {l: i for i, l in enumerate(labels)}
+        print(labels_map)
     else:
-        x_train, y_train, files_name = _get_train_matrices(train_set_folder, labels_df, labels_map,
-                                                           img_resize, process_count)
+        labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
+        labels_map = {l: i for i, l in enumerate(labels)}
+
+    x_train, y_train, files_name = _get_train_matrices(train_set_folder, labels_df, labels_map,
+                                                       img_resize, process_count)
     ret = [np.array(x_train), np.array(y_train, dtype=np.uint8), files_name, {v: k for k, v in labels_map.items()}]
     print("Done. Size consumed by arrays {} mb".format((ret[0].nbytes + ret[1].nbytes) / 1024 / 1024))
     return ret
