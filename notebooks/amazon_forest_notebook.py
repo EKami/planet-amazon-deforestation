@@ -416,7 +416,7 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".
 # <codecell>
 
 del x_land_train, y_land_train
-gc.collect()
+gc.collect();
 
 # <markdowncell>
 
@@ -457,20 +457,14 @@ weather_labels = weather_classifier.map_predictions(weather_predictions, y_weath
 
 # TODO check the self.classifier.compile(loss='binary_crossentropy') in classifier.train_model()
 
-land_tags_list = [None] * len(land_labels)
-weather_tags_list = [None] * len(weather_labels)
+tags_list = [None] * len(land_labels)
 
-for i, tags in enumerate(land_labels):
-    land_tags_list[i] = ' '.join(map(str, tags))
-    
-for i, tags in enumerate(weather_labels):
-    weather_tags_list[i] = ' '.join(map(str, tags))
+for i, (land_tags, weather_tag) in enumerate(zip(land_labels, weather_labels)):
+    tags_list[i] = ' '.join(map(str, land_tags))
+    tags_list[i] += ' ' + weather_tag[0]
 
 # Create the dataframe entries with the land label
-final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, land_tags_list)]
-
-for i, entry in enumerate(final_data):
-    entry[1] = entry[1] + " " + weather_tags_list[i]
+final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, tags_list)]
     
 print(final_data[:5])
 
@@ -485,7 +479,7 @@ final_df.head()
 
 # <codecell>
 
-tags_s = pd.Series(list(chain.from_iterable(land_labels))).value_counts()
+tags_s = pd.Series(list(chain.from_iterable([[*l, *w] for l, w in zip(land_labels, weather_labels)]))).value_counts()
 fig, ax = plt.subplots(figsize=(16, 8))
 sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 
