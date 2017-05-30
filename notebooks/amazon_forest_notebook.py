@@ -38,6 +38,7 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 import data_helper
 from keras_helper import AmazonKerasClassifier
@@ -174,6 +175,17 @@ img_resize = (64, 64) # The resize size of each image
 
 # <markdowncell>
 
+# ### Create a checkpoint
+# 
+# Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
+
+# <codecell>
+
+filepath="weights.best.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
+
+# <markdowncell>
+
 # ### Data preprocessing
 # Preprocess the data in order to fit it into the Keras model.
 # 
@@ -189,14 +201,16 @@ img_resize = (64, 64) # The resize size of each image
 
 # <codecell>
 
-x_weather_train, y_weather_train, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
+x_weather_train, y_weather_train, files_name, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, 
+                                                                                    label_filter='weather', 
+                                                                                    img_resize=img_resize)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
 # <codecell>
 
-print("x_train shape: {}".format(x_weather_train.shape))
-print("y_train shape: {}".format(y_weather_train.shape))
+print("x_weather_train shape: {}".format(x_weather_train.shape))
+print("y_weather_train shape: {}".format(y_weather_train.shape))
 y_weather_map
 
 # <markdowncell>
@@ -204,19 +218,15 @@ y_weather_map
 # ### Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training.
+# 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults.
 
 # <codecell>
 
-# TODO
-
-# <markdowncell>
-
-# ### Free used resources
-# Free the used resources to not use too much RAM
-
-# <codecell>
-
-
+validation_split_size = 0.2
+batch_size = 128
+epochs_arr = [2]
+learn_rates = [0.001]
 
 # <markdowncell>
 
@@ -226,10 +236,57 @@ y_weather_map
 
 # <codecell>
 
-# TODO
-weather_classifier = AmazonKerasClassifier()
+weather_classifier = AmazonKerasClassifier('softmax')
+weather_classifier.add_conv_layer(img_resize)
+weather_classifier.add_flatten_layer()
+weather_classifier.add_ann_layer(len(y_weather_map))
 
-weather_classifier.close()
+train_losses, val_losses = [], []
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = weather_classifier.train_model(x_weather_train, y_weather_train, learn_rate, epochs, 
+                                                                           batch_size, validation_split_size=validation_split_size, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
+
+# <markdowncell>
+
+# ### Monitor the results
+# Check that we do not overfit by plotting the losses of the train and validation sets
+
+# <codecell>
+
+plt.plot(train_losses, label='Training loss')
+plt.plot(val_losses, label='Validation loss')
+plt.legend();
+
+# <markdowncell>
+
+# ### Load Best Weights
+# Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
+
+# <codecell>
+
+weather_classifier.load_weights("weights.best.hdf5")
+print("Weights loaded")
+
+# <markdowncell>
+
+# ### Predict and close the model
+
+# <codecell>
+
+# TODO get the prediction with the best probability
+
+# <markdowncell>
+
+# ### Free used resources
+# Free the used resources to not use too much RAM
+
+# <codecell>
+
+del x_weather_train, y_weather_train
+gc.collect();
 
 # <markdowncell>
 
@@ -243,18 +300,44 @@ weather_classifier.close()
 
 # <codecell>
 
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
-
 filepath="weights.best.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
+
+# <markdowncell>
+
+# ### Data preprocessing
+# Preprocess the data in order to fit it into the Keras model.
+# 
+# Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
+#     - Preprocess training data (images and labels) and train the neural net with it
+#     - Delete the training data and call the gc to free up memory
+#     - Preprocess the first testing set
+#     - Predict the first testing set labels
+#     - Delete the first testing set
+#     - Preprocess the second testing set
+#     - Predict the second testing set labels and append them to the first testing set
+#     - Delete the second testing set
+
+# <codecell>
+
+x_land_train, y_land_train, files_name, y_land_map = data_helper.preprocess_train_data(train_jpeg_dir, 
+                                                                                       train_csv_file, 
+                                                                                       label_filter='land', 
+                                                                                       img_resize=img_resize)
+# Free up all available memory space after this heavy operation
+gc.collect();
+
+# <codecell>
+
+print("x_land_train shape: {}".format(x_land_train.shape))
+print("y_land_train shape: {}".format(y_land_train.shape))
+y_land_map
 
 # <markdowncell>
 
 # ### Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training.
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
@@ -271,25 +354,23 @@ learn_rates = [0.001, 0.0001, 0.00001]
 
 # <codecell>
 
-lands_classifier = AmazonKerasClassifier()
+lands_classifier = AmazonKerasClassifier('sigmoid')
 lands_classifier.add_conv_layer(img_resize)
 lands_classifier.add_flatten_layer()
-lands_classifier.add_ann_layer(len(y_map))
+lands_classifier.add_ann_layer(len(y_land_map))
 
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = lands_classifier.train_model(x_train, y_train, learn_rate, epochs, 
-                                                                           batch_size, validation_split_size=validation_split_size, 
-                                                                           train_callbacks=[checkpoint])
+    tmp_train_losses, tmp_val_losses, fbeta_score = lands_classifier.train_model(x_land_train, y_land_train, 
+                                                                                 learn_rate, epochs, batch_size, 
+                                                                                 validation_split_size=validation_split_size, 
+                                                                                 train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
 
 # <markdowncell>
 
 # ### Load Best Weights
-
-# <markdowncell>
-
 # Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
 
 # <codecell>
@@ -300,9 +381,6 @@ print("Weights loaded")
 # <markdowncell>
 
 # ### Monitor the results
-
-# <markdowncell>
-
 # Check that we do not overfit by plotting the losses of the train and validation sets
 
 # <codecell>
@@ -325,7 +403,7 @@ fbeta_score
 
 # <codecell>
 
-del x_train, y_train
+del x_land_train, y_land_train
 gc.collect()
 
 x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)

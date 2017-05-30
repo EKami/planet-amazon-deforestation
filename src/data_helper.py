@@ -59,6 +59,8 @@ def _train_transform_to_matrices(*args):
     for t in tags.split(' '):
         if t in labels_map.values():
             targets[labels_map[t]] = 1
+        else:
+            pass  # TODO when no labels has been found this entry should be excluded
     return img_array, targets, file_name
 
 

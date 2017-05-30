@@ -25,9 +25,15 @@ class LossHistory(Callback):
 
 
 class AmazonKerasClassifier:
-    def __init__(self):
+    def __init__(self, output_type):
+        """
+        
+        :param output_type: string
+            Either 'softmax' or 'sigmoid'
+        """
         self.losses = []
         self.classifier = Sequential()
+        self.output_type = output_type
 
     def add_conv_layer(self, img_size=(32, 32), img_channels=3):
         self.classifier.add(BatchNormalization(input_shape=(*img_size, img_channels)))
@@ -52,16 +58,17 @@ class AmazonKerasClassifier:
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
-
 
     def add_ann_layer(self, output_size):
         self.classifier.add(Dense(512, activation='relu'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
-        self.classifier.add(Dense(output_size, activation='sigmoid'))
+        if self.output_type == 'sigmoid':
+            self.classifier.add(Dense(output_size, activation='sigmoid'))
+        elif self.output_type == 'softmax':
+            self.classifier.add(Dense(output_size, activation='softmax'))
 
     def _get_fbeta_score(self, classifier, X_valid, y_valid):
         p_valid = classifier.predict(X_valid)
@@ -75,6 +82,7 @@ class AmazonKerasClassifier:
 
         opt = Adam(lr=learn_rate)
 
+        # TODO depending on softmax or sigmoid this loss param can change
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
 
