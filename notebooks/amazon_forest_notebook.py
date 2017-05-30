@@ -187,23 +187,15 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <markdowncell>
 
 # ### Data preprocessing
-# Preprocess the data in order to fit it into the Keras model.
-# 
-# Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
-#     - Preprocess training data (images and labels) and train the neural net with it
-#     - Delete the training data and call the gc to free up memory
-#     - Preprocess the first testing set
-#     - Predict the first testing set labels
-#     - Delete the first testing set
-#     - Preprocess the second testing set
-#     - Predict the second testing set labels and append them to the first testing set
-#     - Delete the second testing set
+# Preprocess the weather data in order to fit it into the Keras model.
 
 # <codecell>
 
-x_weather_train, y_weather_train, files_name, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, 
+x_weather_train, y_weather_train, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, 
                                                                                     label_filter='weather', 
                                                                                     img_resize=img_resize)
+x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
+x_test_add, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
@@ -273,14 +265,18 @@ print("Weights loaded")
 # <markdowncell>
 
 # ### Predict and save the predictions
-# Here we will store our predictions in the `weather_predictions` label so that we can retrieve it at the end of this notebook.
-
+# Here we will store our predictions in the `weather_predictions` variable so that we can retrieve it at the end of this notebook.
+# 
+# /!\ Don't forget the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
 
 # <codecell>
 
-x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
 # Predict the labels of our x_test images
 weather_predictions = weather_classifier.predict(x_test)
+weather_predictions_add = weather_classifier.predict(x_test_add)
+
+weather_predictions = np.vstack((weather_predictions, weather_predictions_add))
+
 weather_classifier.close()
 
 # <markdowncell>
@@ -311,24 +307,14 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <markdowncell>
 
 # ### Data preprocessing
-# Preprocess the data in order to fit it into the Keras model.
-# 
-# Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
-#     - Preprocess training data (images and labels) and train the neural net with it
-#     - Delete the training data and call the gc to free up memory
-#     - Preprocess the first testing set
-#     - Predict the first testing set labels
-#     - Delete the first testing set
-#     - Preprocess the second testing set
-#     - Predict the second testing set labels and append them to the first testing set
-#     - Delete the second testing set
+# Preprocess the lands data in order to fit it into the Keras model.
 
 # <codecell>
 
-x_land_train, y_land_train, files_name, y_land_map = data_helper.preprocess_train_data(train_jpeg_dir, 
-                                                                                       train_csv_file, 
-                                                                                       label_filter='land', 
-                                                                                       img_resize=img_resize)
+x_land_train, y_land_train, y_land_map = data_helper.preprocess_train_data(train_jpeg_dir, 
+                                                                           train_csv_file, 
+                                                                           label_filter='land', 
+                                                                           img_resize=img_resize)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
@@ -404,42 +390,38 @@ fbeta_score
 
 # <markdowncell>
 
-# Before launching our predictions lets preprocess the test data and delete the old training data matrices
+# ### Predict and save the predictions
+# Here we will store our predictions in the `lands_predictions` variable so that we can retrieve it at the end of this notebook.
+# 
+# /!\ Don't forget the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
+
+# <codecell>
+
+lands_predictions = lands_classifier.predict(x_test)
+add_lands_predictions = lands_classifier.predict(x_test_add)
+
+lands_predictions = np.vstack((lands_predictions, add_lands_predictions))
+x_test_filename = np.hstack((x_test_filename, x_test_filename_additional))
+lands_classifier.close()
+
+print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".format(lands_predictions.shape, 
+                                                                                       x_test_filename.shape, 
+                                                                                       lands_predictions[0]))
+
+# <markdowncell>
+
+# ### Free used resources
+# Free the used resources to not use too much RAM
 
 # <codecell>
 
 del x_land_train, y_land_train
 gc.collect()
 
-x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
-# Predict the labels of our x_test images
-predictions = lands_classifier.predict(x_test)
-
 # <markdowncell>
 
-# Now lets launch the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
-
-# <codecell>
-
-del x_test
-gc.collect()
-
-x_test, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
-new_predictions = lands_classifier.predict(x_test)
-
-del x_test
-gc.collect()
-predictions = np.vstack((predictions, new_predictions))
-x_test_filename = np.hstack((x_test_filename, x_test_filename_additional))
-print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".format(predictions.shape, 
-                                                                              x_test_filename.shape,
-                                                                              predictions[0]))
-
-# <markdowncell>
-
-# Before mapping our predictions to their appropriate labels we need to figure out what threshold to take for each class.
-# 
-# To do so we will take the median value of each classes.
+# ### Find prediction thresholds
+# Before mapping our predictions to their appropriate labels we need to figure out what sigmoid threshold to take for each class.
 
 # <codecell>
 
@@ -447,7 +429,7 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".
 thresholds = [0.2] * len(labels_set)
 
 # TODO complete
-tags_pred = np.array(predictions).T
+tags_pred = np.array(lands_predictions).T
 _, axs = plt.subplots(4, 4, figsize=(15, 20))
 axs = axs.ravel()
 
@@ -456,11 +438,16 @@ for i, tag_vals in enumerate(tags_pred):
 
 # <markdowncell>
 
-# Now lets map our predictions to their tags and use the thresholds we just retrieved
+# ## Part 3: Finalize predictions
+
+# <markdowncell>
+
+# ### Get labels out of prediction vectors
 
 # <codecell>
 
-land_labels = lands_classifier.map_predictions(predictions, y_map, thresholds)
+land_labels = lands_classifier.map_predictions(lands_predictions, y_land_map, thresholds)
+weather_labels = weather_classifier.map_predictions(weather_predictions, y_weather_map)
 
 # <markdowncell>
 
@@ -468,21 +455,28 @@ land_labels = lands_classifier.map_predictions(predictions, y_map, thresholds)
 
 # <codecell>
 
-# TODO
-#weather_predictions
+# TODO check the self.classifier.compile(loss='binary_crossentropy') in classifier.train_model()
+
+land_tags_list = [None] * len(land_labels)
+weather_tags_list = [None] * len(weather_labels)
+
+for i, tags in enumerate(land_labels):
+    land_tags_list[i] = ' '.join(map(str, tags))
+    
+for i, tags in enumerate(weather_labels):
+    weather_tags_list[i] = ' '.join(map(str, tags))
+
+# Create the dataframe entries with the land label
+final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, land_tags_list)]
+
+for i, entry in enumerate(final_data):
+    entry[1] = entry[1] + " " + weather_tags_list[i]
+    
+print(final_data[:5])
 
 # <markdowncell>
 
 # Finally lets assemble and visualize our prediction for the test dataset
-
-# <codecell>
-
-tags_list = [None] * len(land_labels)
-
-for i, tags in enumerate(land_labels):
-    tags_list[i] = ' '.join(map(str, tags))
-
-final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, tags_list)]
 
 # <codecell>
 
@@ -506,7 +500,6 @@ sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 # <codecell>
 
 final_df.to_csv('../submission_file.csv', index=False)
-lands_classifier.close()
 
 # <markdowncell>
 

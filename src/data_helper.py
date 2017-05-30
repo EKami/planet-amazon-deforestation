@@ -46,7 +46,6 @@ def _train_transform_to_matrices(*args):
     """
     # Unpack the *args
     file_path, tags, labels_map, img_resize = list(args[0])
-    file_name = file_path.split('/')[-1]
     img = Image.open(file_path)
     img.thumbnail(img_resize)  # Resize the image
 
@@ -60,7 +59,7 @@ def _train_transform_to_matrices(*args):
         if t in labels_map.keys():
             targets[labels_map[t]] = 1
 
-    return img_array, targets, file_name
+    return img_array, targets
 
 
 def _test_transform_to_matrices(*args):
@@ -117,20 +116,18 @@ def _get_train_matrices(train_set_folder, labels_df, labels_map, img_resize, pro
 
     x_train = []
     y_train = []
-    file_names = []
     # Multiprocess transformation, the map() function take a function as a 1st argument
     # and the argument to pass to it as the 2nd argument. These arguments are processed
     # asynchronously on threads defined by process_count and their results are stored in
     # the x_train and y_train lists
     with ThreadPoolExecutor(process_count) as pool:
-        for img_array, targets, file_name in tqdm(pool.map(_train_transform_to_matrices,
-                                                           [(file_path, tag, labels_map, img_resize)
-                                                            for file_path, tag in zip(files_path, tags_list)]),
-                                                  total=len(files_path)):
+        for img_array, targets in tqdm(pool.map(_train_transform_to_matrices,
+                                                [(file_path, tag, labels_map, img_resize)
+                                                 for file_path, tag in zip(files_path, tags_list)]),
+                                       total=len(files_path)):
             x_train.append(img_array)
             y_train.append(targets)
-            file_names.append(file_name)
-    return [x_train, y_train, file_names]
+    return [x_train, y_train]
 
 
 def _get_test_matrices(test_set_folder, img_resize, process_count):
@@ -187,17 +184,17 @@ def preprocess_train_data(train_set_folder, train_csv_file, label_filter='all',
         labels_df = labels_df[labels_df['tags'].str.contains('|'.join(weather_list))]
         labels_map = {l: i for i, l in enumerate(weather_list)}
     elif label_filter == 'land':
+        labels_df.drop(labels_df[~labels_df['tags'].str.contains('|'.join(weather_list))].index, inplace=True)
         labels = set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values]))
         labels = sorted([label for label in labels if label not in weather_list])
         labels_map = {l: i for i, l in enumerate(labels)}
-        # TODO fix, some entries has only weather labels
     else:
         labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         labels_map = {l: i for i, l in enumerate(labels)}
 
-    x_train, y_train, files_name = _get_train_matrices(train_set_folder, labels_df, labels_map,
-                                                       img_resize, process_count)
-    ret = [np.array(x_train), np.array(y_train, dtype=np.uint8), files_name, {v: k for k, v in labels_map.items()}]
+    x_train, y_train = _get_train_matrices(train_set_folder, labels_df, labels_map,
+                                           img_resize, process_count)
+    ret = [np.array(x_train), np.array(y_train, dtype=np.uint8), {v: k for k, v in labels_map.items()}]
     print("Done. Size consumed by arrays {} mb".format((ret[0].nbytes + ret[1].nbytes) / 1024 / 1024))
     return ret
 

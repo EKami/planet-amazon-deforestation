@@ -82,7 +82,7 @@ class AmazonKerasClassifier:
 
         opt = Adam(lr=learn_rate)
 
-        # TODO depending on softmax or sigmoid this loss param can change
+        # TODO depending on softmax or sigmoid this loss param can change, check this!
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
 
@@ -108,20 +108,34 @@ class AmazonKerasClassifier:
         predictions = self.classifier.predict(x_test)
         return predictions
 
-    def map_predictions(self, predictions, labels_map, thresholds):
+    def map_predictions(self, predictions, labels_map, thresholds=()):
         """
-        Return the predictions mapped to their labels
-        :param predictions: the predictions from the predict() method
-        :param labels_map: the map
-        :param thresholds: The threshold of each class to be considered as existing or not existing
+        Return the predictions mapped to their labels.
+        Do not need the classifier to be open
+        :param predictions: array
+            The predictions from the predict() method
+        :param labels_map: map
+            The mapping between the prediction indices and their labels in strings
+        :param thresholds: array
+            Optional, only for sigmoid output: 
+            The threshold of each class to be considered as existing or not existing
         :return: the predictions list mapped to their labels
         """
         predictions_labels = []
-        for prediction in predictions:
-            labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
-            predictions_labels.append(labels)
+        if self.output_type == 'sigmoid':
+            for prediction in predictions:
+                labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
+                predictions_labels.append(labels)
+        elif self.output_type == 'softmax':
+            for prediction in predictions:
+                # Must have one unique label
+                label = labels_map[np.argmax(prediction)]
+                predictions_labels.append([label])
 
         return predictions_labels
 
     def close(self):
+        """
+        Close the classifier
+        """
         backend.clear_session()
