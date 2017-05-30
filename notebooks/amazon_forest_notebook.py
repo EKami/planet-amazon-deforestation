@@ -170,6 +170,10 @@ img_resize = (64, 64) # The resize size of each image
 
 # <markdowncell>
 
+# ## Part 1: Weather labels
+
+# <markdowncell>
+
 # ### Data preprocessing
 # Preprocess the data in order to fit it into the Keras model.
 # 
@@ -185,19 +189,15 @@ img_resize = (64, 64) # The resize size of each image
 
 # <codecell>
 
-x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
+x_weather_train, y_weather_train, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
 # <codecell>
 
-print("x_train shape: {}".format(x_train.shape))
-print("y_train shape: {}".format(y_train.shape))
-y_map
-
-# <markdowncell>
-
-# ## Part 1: Weather labels
+print("x_train shape: {}".format(x_weather_train.shape))
+print("y_train shape: {}".format(y_weather_train.shape))
+y_weather_map
 
 # <markdowncell>
 
@@ -208,6 +208,15 @@ y_map
 # <codecell>
 
 # TODO
+
+# <markdowncell>
+
+# ### Free used resources
+# Free the used resources to not use too much RAM
+
+# <codecell>
+
+
 
 # <markdowncell>
 
