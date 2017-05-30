@@ -225,8 +225,8 @@ y_weather_map
 
 validation_split_size = 0.2
 batch_size = 128
-epochs_arr = [2]
-learn_rates = [0.001]
+epochs_arr = [5, 2, 2]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
@@ -272,11 +272,16 @@ print("Weights loaded")
 
 # <markdowncell>
 
-# ### Predict and close the model
+# ### Predict and save the predictions
+# Here we will store our predictions in the `weather_predictions` label so that we can retrieve it at the end of this notebook.
+
 
 # <codecell>
 
-# TODO get the prediction with the best probability
+x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
+# Predict the labels of our x_test images
+weather_predictions = weather_classifier.predict(x_test)
+weather_classifier.close()
 
 # <markdowncell>
 
@@ -443,11 +448,11 @@ thresholds = [0.2] * len(labels_set)
 
 # TODO complete
 tags_pred = np.array(predictions).T
-_, axs = plt.subplots(5, 4, figsize=(15, 20))
+_, axs = plt.subplots(4, 4, figsize=(15, 20))
 axs = axs.ravel()
 
 for i, tag_vals in enumerate(tags_pred):
-    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(y_map[i])
+    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(y_land_map[i])
 
 # <markdowncell>
 
@@ -455,7 +460,16 @@ for i, tag_vals in enumerate(tags_pred):
 
 # <codecell>
 
-predicted_labels = lands_classifier.map_predictions(predictions, y_map, thresholds)
+land_labels = lands_classifier.map_predictions(predictions, y_map, thresholds)
+
+# <markdowncell>
+
+# ### Combine weather and land predictions
+
+# <codecell>
+
+# TODO
+#weather_predictions
 
 # <markdowncell>
 
@@ -463,8 +477,9 @@ predicted_labels = lands_classifier.map_predictions(predictions, y_map, threshol
 
 # <codecell>
 
-tags_list = [None] * len(predicted_labels)
-for i, tags in enumerate(predicted_labels):
+tags_list = [None] * len(land_labels)
+
+for i, tags in enumerate(land_labels):
     tags_list[i] = ' '.join(map(str, tags))
 
 final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, tags_list)]
@@ -476,7 +491,7 @@ final_df.head()
 
 # <codecell>
 
-tags_s = pd.Series(list(chain.from_iterable(predicted_labels))).value_counts()
+tags_s = pd.Series(list(chain.from_iterable(land_labels))).value_counts()
 fig, ax = plt.subplots(figsize=(16, 8))
 sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 

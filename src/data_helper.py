@@ -57,10 +57,9 @@ def _train_transform_to_matrices(*args):
 
     targets = np.zeros(len(labels_map))
     for t in tags.split(' '):
-        if t in labels_map.values():
+        if t in labels_map.keys():
             targets[labels_map[t]] = 1
-        else:
-            pass  # TODO when no labels has been found this entry should be excluded
+
     return img_array, targets, file_name
 
 
@@ -187,12 +186,11 @@ def preprocess_train_data(train_set_folder, train_csv_file, label_filter='all',
     if label_filter == 'weather':
         labels_df = labels_df[labels_df['tags'].str.contains('|'.join(weather_list))]
         labels_map = {l: i for i, l in enumerate(weather_list)}
-        print(labels_map)
     elif label_filter == 'land':
         labels = set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values]))
         labels = sorted([label for label in labels if label not in weather_list])
         labels_map = {l: i for i, l in enumerate(labels)}
-        print(labels_map)
+        # TODO fix, some entries has only weather labels
     else:
         labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         labels_map = {l: i for i, l in enumerate(labels)}
