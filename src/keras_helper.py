@@ -73,6 +73,18 @@ class AmazonKerasClassifier:
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
 
+
+        #Image Augmentation
+        datagen = ImageDataGenerator(
+                        width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+                        height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
+                        rotation_range=90,      # randomly rotate images 90 degrees
+                        shear_range=0.1,        # randomly shear images by 10%
+                        zoom_range=0.1,
+                        horizontal_flip=True,
+                        vertical_flip=True) # randomly flip images horizontally
+        datagen.fit(X_train)
+
         opt = Adam(lr=learn_rate)
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
@@ -81,12 +93,14 @@ class AmazonKerasClassifier:
         # early stopping will auto-stop training process if model stops learning after 3 epochs
         earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
 
-        self.classifier.fit(X_train, y_train,
-                            batch_size=batch_size,
-                            epochs=epoch,
-                            verbose=1,
-                            validation_data=(X_valid, y_valid),
-                            callbacks=[history, *train_callbacks, earlyStopping])
+
+        self.classifier.fit_generator(datagen.flow(X_train, y_train, batch_size=batch_size),
+                                      epochs=epoch,
+                                      verbose=1,
+                                      validation_data=(X_valid, y_valid),
+                                      steps_per_epoch=X_train.shape[0] // batch_size,
+                                      callbacks=[history, *train_callbacks, earlyStopping])
+
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
 
