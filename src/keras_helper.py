@@ -82,8 +82,13 @@ class AmazonKerasClassifier:
 
         opt = Adam(lr=learn_rate)
 
-        # TODO depending on softmax or sigmoid this loss param can change, check this!
-        self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+        loss_fnc = None
+        if self.output_type == 'sigmoid':
+            loss_fnc = 'binary_crossentropy'
+        elif self.output_type == 'softmax':
+            loss_fnc = 'categorical_crossentropy'
+
+        self.classifier.compile(loss=loss_fnc, optimizer=opt, metrics=['accuracy'])
 
 
         # early stopping will auto-stop training process if model stops learning after 3 epochs

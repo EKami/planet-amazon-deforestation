@@ -455,8 +455,6 @@ weather_labels = weather_classifier.map_predictions(weather_predictions, y_weath
 
 # <codecell>
 
-# TODO check the self.classifier.compile(loss='binary_crossentropy') in classifier.train_model()
-
 tags_list = [None] * len(land_labels)
 
 for i, (land_tags, weather_tag) in enumerate(zip(land_labels, weather_labels)):
