@@ -59,6 +59,7 @@ def _train_transform_to_matrices(*args):
         if t in labels_map.keys():
             targets[labels_map[t]] = 1
 
+    assert sum(targets) > 0, "Image {} has no true labels with tags: [{}".format(file_path, tags)
     return img_array, targets
 
 
@@ -184,7 +185,7 @@ def preprocess_train_data(train_set_folder, train_csv_file, label_filter='all',
         labels_df = labels_df[labels_df['tags'].str.contains('|'.join(weather_list))]
         labels_map = {l: i for i, l in enumerate(weather_list)}
     elif label_filter == 'land':
-        labels_df.drop(labels_df[~labels_df['tags'].str.contains('|'.join(weather_list))].index, inplace=True)
+        labels_df.drop(labels_df[labels_df['tags'].isin(weather_list)].index, inplace=True)
         labels = set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values]))
         labels = sorted([label for label in labels if label not in weather_list])
         labels_map = {l: i for i, l in enumerate(labels)}

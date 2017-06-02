@@ -172,6 +172,8 @@ img_resize = (64, 64) # The resize size of each image
 # <markdowncell>
 
 # ## Part 1: Weather labels
+# 
+# This notebook consists of 2 parts. The first one aims to create a model for the weather labels with a softmax output (as there is at most **one weather per prediction**), the second one aims to create a model on the same training set but on the land labels with a sigmoid output (as there can be **more than one** land label for one given prediction)
 
 # <markdowncell>
 
@@ -217,7 +219,7 @@ y_weather_map
 
 validation_split_size = 0.2
 batch_size = 128
-epochs_arr = [5, 2, 2]
+epochs_arr = [15, 3, 3]
 learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
@@ -264,7 +266,7 @@ print("Weights loaded")
 
 # <markdowncell>
 
-# ### Predict and save the predictions
+# ### Predict and close the classifier
 # Here we will store our predictions in the `weather_predictions` variable so that we can retrieve it at the end of this notebook.
 # 
 # /!\ Don't forget the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
@@ -292,6 +294,8 @@ gc.collect();
 # <markdowncell>
 
 # ## Part 2: Lands labels
+# 
+# This time we'll create the classifier for the land labels
 
 # <markdowncell>
 
@@ -334,7 +338,7 @@ y_land_map
 
 validation_split_size = 0.2
 batch_size = 128
-epochs_arr = [10, 5, 5]
+epochs_arr = [20, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
