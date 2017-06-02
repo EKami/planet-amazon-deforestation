@@ -84,7 +84,7 @@ class AmazonKerasClassifier:
                             callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
-    
+
     def train_model_pseudo(self, comb_feat, comb_pseudo, learn_rate=0.002, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
         history = LossHistory()
 
@@ -101,7 +101,7 @@ class AmazonKerasClassifier:
 
 
         #Pseudo Labeling
-        self.classifier.fit(comb_feat, comb_pseudo,
+        self.classifier.fit(X_train, y_train,
                             batch_size=batch_size,
                             epochs=epoch,
                             verbose=1,
