@@ -108,10 +108,39 @@ class AmazonKerasClassifier:
         :param thresholds: The threshold of each class to be considered as existing or not existing
         :return: the predictions list mapped to their labels
         """
+        y_map_land = {}
+        y_map_land[0] = 'agriculture'
+        y_map_land[1] = 'artisinal_mine'
+        y_map_land[2] = 'bare_ground'
+        y_map_land[3] = 'blooming'
+        y_map_land[4] = 'blow_down'
+        y_map_land[5] = 'conventional_mine'
+        y_map_land[6] = 'cultivation'
+        y_map_land[7] = 'habitation'
+        y_map_land[8] = 'primary'
+        y_map_land[9] = 'road'
+        y_map_land[10] = 'selective_logging'
+        y_map_land[11] = 'slash_burn'
+        y_map_land[12] = 'water'
+
         predictions_labels = []
+
         for prediction in predictions:
-            labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
-            predictions_labels.append(labels)
+            land_list = prediction[[0, 1, 2, 3, 4, 7, 8, 9, 12, 13, 14, 15, 16]]
+            land_labels = [y_map_land[i] for i, value in enumerate(land_list) if value > thresholds[i]]
+
+            max_weather_idx = np.argmax(prediction[[5,6,10,11]])
+            if max_weather_idx == 0:
+                weather_label = labels_map[5]
+            elif max_weather_idx == 1:
+                weather_label = labels_map[6]
+            elif max_weather_idx == 2:
+                weather_label = labels_map[10]
+            elif max_weather_idx == 3:
+                weather_label = labels_map[11]
+
+            land_labels.append(weather_label)
+            predictions_labels.append(land_labels)
 
         return predictions_labels
 
