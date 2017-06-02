@@ -279,6 +279,10 @@ fbeta_score
 
 # <markdowncell>
 
+# ## Pseudo Labeling
+
+# <markdowncell>
+
 # Before launching our predictions lets preprocess the test data
 
 # <codecell>
@@ -287,17 +291,18 @@ x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_re
 
 # <markdowncell>
 
-# ## Pseudo Labeling
-# 
-# Here we can try to create pseudo labels from the predictions on the test set. We will leave out the additional test set for now. 
+# Now we can create pseudo labels from the predictions on the test set. Note that we are only using part of the test set (not including the test additional images).
 
 # <codecell>
 
 # First we predict the labels of our x_test images
 predictions = classifier.predict(x_test)
 
+# Next we need to one-hot encode the predictions using our thresholds
+predictions_list = [[1 if y > 0.17 else 0 for y in x] for x in predictions]
+
 #Next we concatenate our predictions to our training labels (before we delete y_train).
-comb_pseudo = np.concatenate([y_train, predictions])
+comb_pseudo = np.concatenate([y_train, predictions_list])
 
 #We also concatenate our pseudo features with the training features (before we delete x_train and x_test data) 
 comb_feat = np.concatenate([x_train, x_test])
@@ -306,10 +311,17 @@ comb_feat = np.concatenate([x_train, x_test])
 del x_train, y_train
 gc.collect()
 
+#also should delete test data
+del x_test, x_test_trunc
+gc.collect()
+
+# and we can also now delete our initial predictions
+del predictions, predictions_list
+gc.collect()
 
 # <codecell>
 
-#we train the model same as before, but now we are using combined features and pseudo labels. 
+#Now we train the model same as before, but this time we are using combined features and pseudo labels. 
 
 learn_rate = 0.002
 epochs = 1
@@ -317,6 +329,23 @@ epochs = 1
 train_losses, val_losses, fbeta_score = classifier.train_model_pseudo(comb_feat, comb_pseudo, learn_rate, epochs,
                                                                       batch_size, validation_split_size=validation_split_size, 
                                                                       train_callbacks=[checkpoint])
+
+# <markdowncell>
+
+# ## Make Predictions
+# We can now use our model to make predictions.
+
+# <codecell>
+
+# We should first delete the pseudo labels to save memory
+del comb_feat, comb_pseudo
+gc.collect()
+
+# Load in the test set for preprocessing again
+x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
+
+# Predict the labels of our x_test images this time using our model that trained on pseudo labels
+predictions = classifier.predict(x_test)
 
 # <markdowncell>
 
@@ -345,8 +374,8 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".
 
 # <codecell>
 
-# For now we'll just put all thresholds to 0.2 
-thresholds = [0.2] * len(labels_set)
+# From testing we found that the best threshold here is 0.17
+thresholds = [0.17] * len(labels_set)
 
 # TODO complete
 tags_pred = np.array(predictions).T
