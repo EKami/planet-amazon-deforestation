@@ -57,8 +57,22 @@ class AmazonKerasClassifier:
         self.classifier.add(Flatten())
 
 
-    def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(512, activation='relu'))
+    def add_flatten_layerTL(self, input_shape):
+        self.classifier.add(Flatten(input_shape=input_shape))
+
+
+    def add_ann_layer(self, filters, output_size):
+        self.classifier.add(Dense(filters, activation='relu'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Dropout(0.5))
+        self.classifier.add(Dense(output_size, activation='sigmoid'))
+
+
+    def add_ann_layer_double(self, filters, output_size):
+        self.classifier.add(Dense(filters, activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Dropout(0.5))
+        self.classifier.add(Dense(filters, activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
