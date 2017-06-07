@@ -245,12 +245,12 @@ save_array('VGG16_train.bc', VGG16_train)
 # assign the loaded bottleneck features
 VGG16_train = load_array('VGG16_train.bc')
 
-#check to make sure the shape for bottleneck features is as expected
-VGG16_train.shape
-
 # For now we just need training bottlenecks, we can load in the test data later when we make predictions
 del x_train
 gc.collect()
+
+#check to make sure the shape for bottleneck features is as expected
+VGG16_train.shape
 
 # <markdowncell>
 
@@ -274,12 +274,12 @@ save_array('VGG16_test.bc', VGG16_test)
 # assign the loaded bottleneck features
 VGG16_test = load_array('VGG16_test.bc')
 
-#check to make sure the shape for bottleneck features is as expected
-VGG16_test.shape
-
 # For now we just need training bottlenecks, we can load in the test data later when we make predictions
 del x_test, x_test_filename, VGG16_test
 gc.collect()
+
+#check to make sure the shape for bottleneck features is as expected
+VGG16_test.shape
 
 # <codecell>
 
@@ -299,12 +299,11 @@ save_array('VGG16_test_additional.bc', VGG16_test_additional)
 # assign the loaded bottleneck features
 VGG16_test_additional = load_array('VGG16_test_additional.bc')
 
-#check to make sure the shape for bottleneck features is as expected
-VGG16_test_additional.shape
-
-
 del x_test_additional, x_test_filename_additional, VGG16_test_additional
 gc.collect()
+
+#check to make sure the shape for bottleneck features is as expected
+VGG16_test_additional.shape
 
 # <markdowncell>
 
