@@ -239,8 +239,6 @@ model.summary()
 # Extract bottleneck features from the VGG16 model
 VGG16_train = model.predict(x_train)
 
-VGG16_test_additional = model.predict(x_test_additional)
-
 #save the bottleneck features to disk for later access
 save_array('VGG16_train.bc', VGG16_train)
 
