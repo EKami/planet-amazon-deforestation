@@ -151,19 +151,13 @@ def _get_test_matrices(test_set_folder, img_resize, process_count):
     return [x_test, x_test_filename]
 
 
-def preprocess_train_data(train_set_folder, train_csv_file, filter='all',
-                          img_resize=(32, 32), process_count=cpu_count()):
+def preprocess_train_data(train_set_folder, train_csv_file, img_resize=(32, 32), process_count=cpu_count()):
     """
     Transform the train images to ready to use data for the CNN 
     :param train_set_folder: string
         The folder containing the images for training
     :param train_csv_file: string
         The file containing the labels of the training images
-    :param filter: string
-        either:
-            - 'all' to preprocess all the images
-            - 'weather' to preprocess only the weather data
-            - 'land' to preprocess only the land data
     :param img_resize: tuple
         The standard size you want to have on images when transformed to matrices
     :param process_count: int
@@ -198,3 +192,7 @@ def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu
     ret = [np.array(x_test), x_test_filename]
     print("Done. Size consumed by arrays {} mb".format(ret[0].nbytes / 1024 / 1024))
     return ret
+
+
+def train_generator(train_set_folder, train_csv_file, batch_size):
+    pass

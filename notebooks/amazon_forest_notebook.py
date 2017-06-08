@@ -185,7 +185,7 @@ img_resize = (64, 64) # The resize size of each image
 
 # <codecell>
 
-x_weather_train, y_weather_train, y_weather_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
+x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
