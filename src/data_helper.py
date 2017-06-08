@@ -194,6 +194,66 @@ def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu
     return ret
 
 
+def _val_transform_to_matrices(*args):
+    """
+    :param args: list of arguments
+        file_name: string
+            The name of the image
+        img_resize: tuple (int, int)
+            The resize size of the original image given by the file_path argument
+        :return: img_array, file_name
+            img_array: Numpy array
+                The image from the file_path as a numpy array resized with img_resize
+            file_name: string
+                The name of the test image
+        """
+    file_path, val_labels, img_resize = list(args[0])
+    img = Image.open(file_path)
+    img.thumbnail(img_resize)
+
+    # Augment the image `img` here
+
+    # Convert to RGB and normalize
+    img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
+    return img_array, val_labels
+
+
+def preprocess_val_files(val_files, val_labels, img_resize=(32, 32), process_count=cpu_count()):
+    """
+    Transform the images to ready to use data for the CNN
+    :param val_labels: list
+        List of file labels
+    :param val_files: list
+        List of file path
+    :param img_resize: tuple
+        The standard size you want to have on images when transformed to matrices
+    :param process_count: int
+        The number of process you want to use to preprocess the data.
+        If you run into issues, lower this number. Its default value is equal to the number of core of your CPU
+    :return: The images matrices and labels as [x_test, x_test_filename]
+        x_test: The X test values as a numpy array
+        x_test_filename: The files name of each test images in the same order as the x_test arrays
+    """
+    x = []
+    final_val_labels = []
+
+    # Multiprocess transformation, the map() function take a function as a 1st argument
+    # and the argument to pass to it as the 2nd argument. These arguments are processed
+    # asynchronously on threads defined by process_count and their results are stored in
+    # the x_test and x_test_filename lists
+    print("Transforming val dataset...")
+    with ThreadPoolExecutor(process_count) as pool:
+        for img_array, targets in tqdm(pool.map(_val_transform_to_matrices,
+                                                [(file_path, val_labels, img_resize)
+                                                 for file_path, val_labels in zip(val_files, val_labels)]),
+                                       total=len(val_files)):
+            x.append(img_array)
+            final_val_labels.append(targets)
+    ret = [np.array(x), np.array(final_val_labels)]
+    print("Done. Size consumed by arrays {} mb".format(ret[0].nbytes / 1024 / 1024))
+    return ret
+
+
 def _get_class_mapping(*args):
     """
 

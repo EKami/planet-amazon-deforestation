@@ -1,7 +1,10 @@
 import numpy as np
 import os
+import random
 
+import data_helper
 from sklearn.metrics import fbeta_score
+from PIL import Image
 
 import tensorflow.contrib.keras.api.keras as k
 from tensorflow.contrib.keras.api.keras.models import Sequential
@@ -64,14 +67,31 @@ class AmazonKerasClassifier:
         p_valid = classifier.predict(X_valid)
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
-    def _train_generator(self, train_files_list, train_csv_file, img_resize, batch_size):
-        # TODO finish
-        pass
+    def _train_generator(self, train_files, y_labels, img_resize, batch_size):
+
+        for i in range(len(train_files)):
+            batch_features = np.zeros((batch_size, *img_resize, 3))
+            batch_labels = np.zeros((batch_size, len(y_labels[0])))
+
+            offset = batch_size * i
+            for j in range(min(batch_size, len(train_files) - offset)):
+                img = Image.open(train_files[offset + j])
+                img.thumbnail(img_resize)  # Resize the image
+
+                # Augment the image `img` here
+
+                # Convert to RGB and normalize
+                img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                batch_features[j] = img_array
+                batch_labels[j] = y_labels[offset + j]
+            yield batch_features, batch_labels
 
     def train_model(self, train_files_list, train_labels, val_files_list, val_labels, img_resize,
                     learn_rate=0.001, epoch=5, batch_size=128, train_callbacks=()):
         history = LossHistory()
-        generator = _train_generator(train_files_list, train_labels, img_resize, batch_size)
+        X_valid, y_valid = data_helper.preprocess_val_files(val_files_list, val_labels, img_resize)
+        generator = self._train_generator(train_files_list, train_labels, img_resize, batch_size)
+
         opt = Adam(lr=learn_rate)
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
@@ -82,7 +102,7 @@ class AmazonKerasClassifier:
         self.classifier.fit_generator(generator, len(train_files_list) / batch_size,
                                       epochs=epoch,
                                       verbose=1,
-                                      validation_data=(val_files_list, val_labels),
+                                      validation_data=(X_valid, y_valid),
                                       callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]

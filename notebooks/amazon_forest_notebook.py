@@ -232,7 +232,7 @@ classifier.add_ann_layer(len(y_map))
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train_files, y_train_files,
-                                                                           x_val_files, y_val_files, img_resize
+                                                                           x_val_files, y_val_files, img_resize,
                                                                            learn_rate, epochs, batch_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
