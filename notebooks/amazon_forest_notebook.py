@@ -161,12 +161,15 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Image Resize
-# Define the dimensions of the image data trained by the network. Due to memory constraints we can't load in the full size 256x256 jpg images. Recommended resized images could be 32x32, 64x64, or 128x128.
+# # Image Resize & Validation split
+# Define the dimensions of the image data trained by the network. Recommended resized images could be 32x32, 64x64, or 128x128 to speedup the training. 
+# 
+# You could also use `None` to use full sized images
 
 # <codecell>
 
 img_resize = (64, 64) # The resize size of each image
+validation_split_size = 0.2
 
 # <markdowncell>
 
@@ -176,15 +179,14 @@ img_resize = (64, 64) # The resize size of each image
 
 # <codecell>
 
-x_train_files, y_train_files, x_val_files, y_val_files, y_map = data_helper.get_train_data_files(train_jpeg_dir,
-                                                                                                 train_csv_file)
-# Free up all available memory space after this heavy operation
-gc.collect();
+x_train_files, y_train_files, x_val_files, y_val_files, y_map = data_helper.get_train_data_files(train_jpeg_dir, 
+                                                                                                 train_csv_file, 
+                                                                                                 validation_split_size)
 
 # <codecell>
 
-print("x_train_files shape: {}".format(x_train.shape))
-print("y_train_files shape: {}".format(y_train.shape))
+print("x_train_files/y_train_files lenght: {}/{}".format(len(x_train_files), len(y_train_files)))
+print("x_val_files/y_val_files lenght: {}/{}".format(len(x_val_files), len(y_val_files)))
 y_map
 
 # <markdowncell>
@@ -205,19 +207,20 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # ## Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training. 
+# 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
-validation_split_size = 0.2
 batch_size = 128
+epochs_arr = [10, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
 # ## Define and Train model
 # 
 # Here we define the model and begin training. 
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
@@ -227,8 +230,6 @@ classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
 
 train_losses, val_losses = [], []
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train_files, y_train_files,
                                                                            x_val_files, y_val_files, img_resize

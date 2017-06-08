@@ -194,14 +194,76 @@ def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu
     return ret
 
 
-def get_train_data_files(train_jpeg_dir, train_csv_file):
+def _get_class_mapping(*args):
     """
 
+    :param args: list of arguments
+        file_path: string
+            The path of the image
+        tags_str: string
+            The associated tags as 1 string
+        labels_map: dict {int: string}
+            The map between the image label and their id
+    :return: img_array, targets
+        file_path: string
+            The path to the file
+        targets: Numpy array
+            A 17 length vector
+    """
+    # Unpack the *args
+    file_path, tags_str, labels_map = list(args[0])
+    targets = np.zeros(len(labels_map))
+
+    for t in tags_str.split(' '):
+        targets[labels_map[t]] = 1
+    return file_path, targets
+
+
+def get_train_data_files(train_jpeg_dir, train_csv_file, validation_split=0.2, process_count=cpu_count()):
+    """
+
+    :param process_count: int
+        The number of process you want to use to preprocess the data.
+        If you run into issues, lower this number. Its default value is equal to the number of core of your CPU
+    :param validation_split: float
+        Value between 0 and 1 used to split training set from validation set
     :param train_jpeg_dir: string
         The directory of the train files
     :param train_csv_file: string
         The path of the file containing the training labels
     :return:
     """
-    
-    return [x_train_files, y_train_files, x_val_files, y_val_files, y_map]
+    labels_df = pd.read_csv(train_csv_file)
+    x_train_files, y_train_files = [], []
+    x_val_files, y_val_files = [], []
+
+    files_path = []
+    tags_list = []
+    for file_name, tags in labels_df.values:
+        files_path.append('{}/{}.jpg'.format(train_jpeg_dir, file_name))
+        tags_list.append(tags)
+
+    limit = int(len(files_path) * (1 - validation_split))
+    train_files, train_tags = files_path[:limit], tags_list[:limit]
+    val_files, val_tags = files_path[limit:], tags_list[limit:]
+
+    labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
+    y_map = {l: i for i, l in enumerate(labels)}
+
+    with ThreadPoolExecutor(process_count) as pool:
+        for file_name, targets in tqdm(pool.map(_get_class_mapping,
+                                                [(file_name, tags, y_map)
+                                                 for file_name, tags in zip(train_files, train_tags)]),
+                                       total=len(train_files)):
+            x_train_files.append(file_name)
+            y_train_files.append(targets)
+
+    with ThreadPoolExecutor(process_count) as pool:
+        for file_name, targets in tqdm(pool.map(_get_class_mapping,
+                                                [(file_name, tags, y_map)
+                                                 for file_name, tags in zip(val_files, val_tags)]),
+                                       total=len(val_files)):
+                x_val_files.append(file_name)
+                y_val_files.append(targets)
+
+    return [x_train_files, y_train_files, x_val_files, y_val_files, {v: k for k, v in y_map.items()}]
