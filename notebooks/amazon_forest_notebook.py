@@ -171,28 +171,20 @@ img_resize = (64, 64) # The resize size of each image
 # <markdowncell>
 
 # # Data preprocessing
-# Preprocess the data in order to fit it into the Keras model.
-# 
-# Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
-#     - Preprocess training data (images and labels) and train the neural net with it
-#     - Delete the training data and call the gc to free up memory
-#     - Preprocess the first testing set
-#     - Predict the first testing set labels
-#     - Delete the first testing set
-#     - Preprocess the second testing set
-#     - Predict the second testing set labels and append them to the first testing set
-#     - Delete the second testing set
+# Due to the hudge amount of memory the preprocessed images can take, we will just retrieve all file names and split them between training and validation sets in this step.
+# The resulting lists won't contain the transformed images but only the file paths.
 
 # <codecell>
 
-x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
+x_train_files, y_train_files, x_val_files, y_val_files, y_map = data_helper.get_train_data_files(train_jpeg_dir,
+                                                                                                 train_csv_file)
 # Free up all available memory space after this heavy operation
 gc.collect();
 
 # <codecell>
 
-print("x_train shape: {}".format(x_train.shape))
-print("y_train shape: {}".format(y_train.shape))
+print("x_train_files shape: {}".format(x_train.shape))
+print("y_train_files shape: {}".format(y_train.shape))
 y_map
 
 # <markdowncell>
@@ -238,8 +230,9 @@ train_losses, val_losses = [], []
 epochs_arr = [10, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
-                                                                           batch_size, validation_split_size=validation_split_size, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train_files, y_train_files,
+                                                                           x_val_files, y_val_files, img_resize
+                                                                           learn_rate, epochs, batch_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses

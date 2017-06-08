@@ -194,5 +194,14 @@ def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu
     return ret
 
 
-def train_generator(train_set_folder, train_csv_file, batch_size):
-    pass
+def get_train_data_files(train_jpeg_dir, train_csv_file):
+    """
+
+    :param train_jpeg_dir: string
+        The directory of the train files
+    :param train_csv_file: string
+        The path of the file containing the training labels
+    :return:
+    """
+    
+    return [x_train_files, y_train_files, x_val_files, y_val_files, y_map]

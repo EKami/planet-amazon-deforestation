@@ -2,7 +2,6 @@ import numpy as np
 import os
 
 from sklearn.metrics import fbeta_score
-from sklearn.model_selection import train_test_split
 
 import tensorflow.contrib.keras.api.keras as k
 from tensorflow.contrib.keras.api.keras.models import Sequential
@@ -52,10 +51,8 @@ class AmazonKerasClassifier:
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
-
 
     def add_ann_layer(self, output_size):
         self.classifier.add(Dense(512, activation='relu'))
@@ -67,26 +64,26 @@ class AmazonKerasClassifier:
         p_valid = classifier.predict(X_valid)
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
-    def train_model(self, x_train, y_train, learn_rate=0.001, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+    def _train_generator(self, train_files_list, train_csv_file, img_resize, batch_size):
+        # TODO finish
+        pass
+
+    def train_model(self, train_files_list, train_labels, val_files_list, val_labels, img_resize,
+                    learn_rate=0.001, epoch=5, batch_size=128, train_callbacks=()):
         history = LossHistory()
-
-        X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
-                                                              test_size=validation_split_size)
-
+        generator = _train_generator(train_files_list, train_labels, img_resize, batch_size)
         opt = Adam(lr=learn_rate)
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-
         # early stopping will auto-stop training process if model stops learning after 3 epochs
         earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
 
-        self.classifier.fit(X_train, y_train,
-                            batch_size=batch_size,
-                            epochs=epoch,
-                            verbose=1,
-                            validation_data=(X_valid, y_valid),
-                            callbacks=[history, *train_callbacks, earlyStopping])
+        self.classifier.fit_generator(generator, len(train_files_list) / batch_size,
+                                      epochs=epoch,
+                                      verbose=1,
+                                      validation_data=(val_files_list, val_labels),
+                                      callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
 
