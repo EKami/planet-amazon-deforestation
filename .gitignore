@@ -3,6 +3,15 @@ input/*
 submission_file.csv
 notebooks/amazon_forest_notebook.ipynb
 notebooks/weights.best.hdf5
+notebooks/x_train.bc
+notebooks/y_train.bc
+notebooks/VGG16_test.bc
+notebooks/VGG16_test_additional.bc
+notebooks/VGG16_train.bc
+notebooks/x_test.bc
+notebooks/x_test_additional.bc
+notebooks/x_test_filename.bc
+notebooks/x_test_filename_additional.bc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
