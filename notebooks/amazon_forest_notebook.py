@@ -212,8 +212,8 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 batch_size = 128
-epochs_arr = [2, 1] #[10, 5, 5]
-learn_rates = [0.001, 0.0001] #[0.001, 0.0001, 0.00001]
+epochs_arr = [10, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
@@ -276,10 +276,11 @@ fbeta_score
 
 # <codecell>
 
-predictions = classifier.predict()
-print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".format(predictions.shape, 
+predictions, x_test_filename = classifier.predict(batch_size) # We use the same number of steps as the batch size
+
+print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
-                                                                              predictions[0]))
+                                                                              x_test_filename[0], predictions[0]))
 
 # <markdowncell>
 
@@ -298,7 +299,7 @@ _, axs = plt.subplots(5, 4, figsize=(15, 20))
 axs = axs.ravel()
 
 for i, tag_vals in enumerate(tags_pred):
-    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(y_map[i])
+    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(preprocessor.y_map[i])
 
 # <markdowncell>
 
@@ -306,7 +307,7 @@ for i, tag_vals in enumerate(tags_pred):
 
 # <codecell>
 
-predicted_labels = classifier.map_predictions(predictions, y_map, thresholds)
+predicted_labels = classifier.map_predictions(predictions, thresholds)
 
 # <markdowncell>
 

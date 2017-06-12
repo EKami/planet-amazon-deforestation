@@ -92,7 +92,7 @@ class AmazonKerasClassifier:
     def load_weights(self, weight_file_path):
         self.classifier.load_weights(weight_file_path)
 
-    def predict(self):
+    def predict(self, steps=128):
         """
         Launch the predictions on the test dataset as well as the additional test dataset
         :return:
@@ -101,21 +101,20 @@ class AmazonKerasClassifier:
             filenames: list
                 File names associated to each prediction
         """
-        generator = self.preprocessor.get_prediction_generator()
-        predictions_labels = self.classifier.predict_generator(generator)
-        return predictions_labels, self.preprocessor.X_test_filenames
+        generator = self.preprocessor.get_prediction_generator(steps)
+        predictions_labels = self.classifier.predict_generator(generator, steps)
+        return predictions_labels, np.array(self.preprocessor.X_test)
 
-    def map_predictions(self, predictions, labels_map, thresholds):
+    def map_predictions(self, predictions, thresholds):
         """
         Return the predictions mapped to their labels
         :param predictions: the predictions from the predict() method
-        :param labels_map: the map
         :param thresholds: The threshold of each class to be considered as existing or not existing
         :return: the predictions list mapped to their labels
         """
         predictions_labels = []
         for prediction in predictions:
-            labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
+            labels = [self.preprocessor.y_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
             predictions_labels.append(labels)
 
         return predictions_labels

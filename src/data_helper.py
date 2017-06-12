@@ -85,10 +85,30 @@ class AmazonPreprocessor:
                     batch_labels[j] = self.y_train[start_offset + j]
                 yield batch_features, batch_labels
 
-    def get_prediction_generator(self):
-        # TODO finish
+    def get_prediction_generator(self, batch_size):
         while True:
-            pass
+            for i in range(len(self.X_test_filename)):
+                start_offset = batch_size * i
+
+                # The last remaining files could be smaller than the batch_size
+                range_offset = min(batch_size, len(self.X_test_filename) - start_offset)
+
+                # If we reached the end of the list then we break the loop
+                if range_offset <= 0:
+                    break
+
+                img_arrays = np.zeros((range_offset, *self.img_resize, 3))
+
+                for j in range(range_offset):
+                    img = Image.open(self.X_test_filename[start_offset + j])
+                    img.thumbnail(self.img_resize)  # Resize the image
+
+                    # Augment the image `img` here
+
+                    # Convert to RGB and normalize
+                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                    img_arrays[j] = img_array
+                yield img_arrays
 
     def _get_class_mapping(self, *args):
         """
@@ -231,30 +251,3 @@ def get_jpeg_data_files_paths():
     test_jpeg_additional = os.path.join(data_root_folder, 'test-jpg-additional')
     train_csv_file = os.path.join(data_root_folder, 'train_v2.csv')
     return [train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file]
-
-
-
-def _test_transform_to_matrices(*args):
-    """
-    :param args: list of arguments
-        test_set_folder: string
-            The path of the all the test images
-        file_name: string
-            The name of the test image
-        img_resize: tuple (int, int)
-            The resize size of the original image given by the file_path argument
-        :return: img_array, file_name
-            img_array: Numpy array
-                The image from the file_path as a numpy array resized with img_resize
-            file_name: string
-                The name of the test image
-        """
-    test_set_folder, file_name, img_resize = list(args[0])
-    img = Image.open('{}/{}'.format(test_set_folder, file_name))
-    img.thumbnail(img_resize)
-
-    # Augment the image `img` here
-
-    # Convert to RGB and normalize
-    img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
-    return img_array, file_name
