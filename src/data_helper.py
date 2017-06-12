@@ -44,15 +44,18 @@ class AmazonPreprocessor:
         self.X_val = None
         self.y_val = None
         self.y_map = None
+        self.X_test = None
+        self.X_test_filename = None
 
     def init(self):
         """
         Initialize the preprocessor and preprocess required data for the classifier to use
         :return:
         """
-        # The validation data cannot be preprocessed in batches as we also need them to compute the f2 score
         self.X_train, self.y_train, self.X_val, self.y_val, self.y_map = self._get_train_data_files()
-        # Transform the list of image paths to numpy matrices
+        # Contains all the test files including the additional ones
+        self.X_test, self.X_test_filename = self._get_test_data_files()
+        # The validation data cannot be preprocessed in batches as we also need them to compute the f2 score
         self.X_val, self.y_val = self._preprocess_val_files()
 
     def get_train_generator(self, batch_size):
@@ -81,6 +84,11 @@ class AmazonPreprocessor:
                     batch_features[j] = img_array
                     batch_labels[j] = self.y_train[start_offset + j]
                 yield batch_features, batch_labels
+
+    def get_prediction_generator(self):
+        # TODO finish
+        while True:
+            pass
 
     def _get_class_mapping(self, *args):
         """
@@ -185,6 +193,7 @@ class AmazonPreprocessor:
         # asynchronously on threads defined by process_count and their results are stored in
         # the x_test and x_test_filename lists
         print("Transforming val dataset...")
+        sys.stdout.flush()
         with ThreadPoolExecutor(self.process_count) as pool:
             for img_array, targets in tqdm(pool.map(self._val_transform_to_matrices,
                                                     [(file_path, labels)
@@ -193,8 +202,19 @@ class AmazonPreprocessor:
                 x.append(img_array)
                 final_val_labels.append(targets)
         ret = [np.array(x), np.array(final_val_labels)]
-        print("Done. Size consumed by arrays {} mb".format(ret[0].nbytes / 1024 / 1024))
+        print("Done. Size consumed by validation matrices {} mb".format(ret[0].nbytes / 1024 / 1024))
+        sys.stdout.flush()
         return ret
+
+    def _get_test_data_files(self):
+        files_name = os.listdir(self.test_jpeg_dir)
+        files_name_add = os.listdir(self.test_additional_jpeg_dir)
+        # ! hstack is deprecated
+        X_test_filename = np.hstack(([name.split(".")[0] for name in files_name],
+                                     [name.split(".")[0] for name in files_name_add]))
+        X_test_file_path = np.hstack(([self.test_jpeg_dir + "/" + name for name in files_name],
+                                      [self.test_additional_jpeg_dir + "/" + name for name in files_name_add]))
+        return X_test_filename, X_test_file_path
 
 
 def get_jpeg_data_files_paths():
@@ -238,42 +258,3 @@ def _test_transform_to_matrices(*args):
     # Convert to RGB and normalize
     img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
     return img_array, file_name
-
-
-def _get_test_matrices(test_set_folder, img_resize, process_count):
-    x_test = []
-    x_test_filename = []
-    files_name = os.listdir(test_set_folder)
-
-    # Multiprocess transformation, the map() function take a function as a 1st argument
-    # and the argument to pass to it as the 2nd argument. These arguments are processed
-    # asynchronously on threads defined by process_count and their results are stored in
-    # the x_test and x_test_filename lists
-    with ThreadPoolExecutor(process_count) as pool:
-        for img_array, file_name in tqdm(pool.map(_test_transform_to_matrices,
-                                                  [(test_set_folder, file_name, img_resize)
-                                                   for file_name in files_name]),
-                                         total=len(files_name)):
-            x_test.append(img_array)
-            x_test_filename.append(file_name)
-    return [x_test, x_test_filename]
-
-
-def preprocess_test_data(test_set_folder, img_resize=(32, 32), process_count=cpu_count()):
-    """
-    Transform the images to ready to use data for the CNN
-    :param test_set_folder: string
-        The folder containing the images for testing
-    :param img_resize: tuple
-        The standard size you want to have on images when transformed to matrices
-    :param process_count: int
-        The number of process you want to use to preprocess the data.
-        If you run into issues, lower this number. Its default value is equal to the number of core of your CPU
-    :return: The images matrices and labels as [x_test, x_test_filename]
-        x_test: The X test values as a numpy array
-        x_test_filename: The files name of each test images in the same order as the x_test arrays
-    """
-    x_test, x_test_filename = _get_test_matrices(test_set_folder, img_resize, process_count)
-    ret = [np.array(x_test), x_test_filename]
-    print("Done. Size consumed by arrays {} mb".format(ret[0].nbytes / 1024 / 1024))
-    return ret

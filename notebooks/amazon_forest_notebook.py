@@ -272,30 +272,11 @@ fbeta_score
 
 # <markdowncell>
 
-# Before launching our predictions lets preprocess the test data and delete the old training data matrices
+# ## Make predictions
 
 # <codecell>
 
-x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
-# Predict the labels of our x_test images
-predictions = classifier.predict(x_test)
-
-# <markdowncell>
-
-# Now lets launch the predictions on the additional dataset (updated on 05/05/2017 on Kaggle)
-
-# <codecell>
-
-del x_test
-gc.collect()
-
-x_test, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
-new_predictions = classifier.predict(x_test)
-
-del x_test
-gc.collect()
-predictions = np.vstack((predictions, new_predictions))
-x_test_filename = np.hstack((x_test_filename, x_test_filename_additional))
+predictions = classifier.predict()
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               predictions[0]))

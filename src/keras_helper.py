@@ -92,9 +92,18 @@ class AmazonKerasClassifier:
     def load_weights(self, weight_file_path):
         self.classifier.load_weights(weight_file_path)
 
-    def predict(self, x_test):
-        predictions = self.classifier.predict(x_test)
-        return predictions
+    def predict(self):
+        """
+        Launch the predictions on the test dataset as well as the additional test dataset
+        :return:
+            predictions_labels: list
+                An array containing 17 length long arrays
+            filenames: list
+                File names associated to each prediction
+        """
+        generator = self.preprocessor.get_prediction_generator()
+        predictions_labels = self.classifier.predict_generator(generator)
+        return predictions_labels, self.preprocessor.X_test_filenames
 
     def map_predictions(self, predictions, labels_map, thresholds):
         """
