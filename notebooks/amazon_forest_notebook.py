@@ -170,7 +170,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (64, 64) # The resize size of each image
+img_resize = None # The resize size of each image ex: (64, 64), None use the default image size
 validation_split_size = 0.2
 
 # <markdowncell>
@@ -207,12 +207,14 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # 
 # Choose your hyperparameters below for training. 
 # 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults.
+# 
+# If you opted for a high `img_resize` then you may want to lower the `batch_size` to fit your images matrices into the GPU memory. With an `img_resize` of `(256, 256)` (the default size) and a batch_size of `64` you should at least have a GPU with 8GB or VRAM.
 
 # <codecell>
 
-batch_size = 128
-epochs_arr = [10, 5, 5]
+batch_size = 64
+epochs_arr = [20, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
@@ -224,7 +226,7 @@ learn_rates = [0.001, 0.0001, 0.00001]
 # <codecell>
 
 classifier = AmazonKerasClassifier(preprocessor)
-classifier.add_conv_layer(img_resize)
+classifier.add_conv_layer()
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(preprocessor.y_map))
 

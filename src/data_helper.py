@@ -50,11 +50,15 @@ class AmazonPreprocessor:
     def init(self):
         """
         Initialize the preprocessor and preprocess required data for the classifier to use
-        :return:
         """
         self.X_train, self.y_train, self.X_val, self.y_val, self.y_map = self._get_train_data_files()
         # Contains all the test files including the additional ones
         self.X_test, self.X_test_filename = self._get_test_data_files()
+
+        if not self.img_resize:
+            self.img_resize = Image.open(self.X_test_filename[0]).size
+            print("Default image size is", self.img_resize)
+
         # The validation data cannot be preprocessed in batches as we also need them to compute the f2 score
         self.X_val, self.y_val = self._preprocess_val_files()
 
@@ -75,7 +79,7 @@ class AmazonPreprocessor:
 
                 for j in range(range_offset):
                     img = Image.open(self.X_train[start_offset + j])
-                    img.thumbnail(self.img_resize)  # Resize the image
+                    img.thumbnail(self.img_resize)
 
                     # Augment the image `img` here
 
@@ -101,7 +105,7 @@ class AmazonPreprocessor:
 
                 for j in range(range_offset):
                     img = Image.open(self.X_test_filename[start_offset + j])
-                    img.thumbnail(self.img_resize)  # Resize the image
+                    img.thumbnail(self.img_resize)
 
                     # Augment the image `img` here
 
