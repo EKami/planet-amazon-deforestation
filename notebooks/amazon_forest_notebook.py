@@ -179,14 +179,13 @@ validation_split_size = 0.2
 
 # <codecell>
 
-x_train_files, y_train_files, x_val_files, y_val_files, y_map = data_helper.get_train_data_files(train_jpeg_dir, 
-                                                                                                 train_csv_file, 
-                                                                                                 validation_split_size)
+X_train, y_train, X_val, y_val, y_map = data_helper.get_train_data_files(train_jpeg_dir, train_csv_file, 
+                                                                         validation_split_size)
 
 # <codecell>
 
-print("x_train_files/y_train_files lenght: {}/{}".format(len(x_train_files), len(y_train_files)))
-print("x_val_files/y_val_files lenght: {}/{}".format(len(x_val_files), len(y_val_files)))
+print("X_train/y_train lenght: {}/{}".format(len(X_train), len(y_train)))
+print("X_val/y_val lenght: {}/{}".format(len(X_val), len(y_val)))
 y_map
 
 # <markdowncell>
@@ -231,8 +230,8 @@ classifier.add_ann_layer(len(y_map))
 
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train_files, y_train_files,
-                                                                           x_val_files, y_val_files, img_resize,
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(X_train, y_train,
+                                                                           X_val, y_val, img_resize,
                                                                            learn_rate, epochs, batch_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
@@ -278,9 +277,6 @@ fbeta_score
 # Before launching our predictions lets preprocess the test data and delete the old training data matrices
 
 # <codecell>
-
-del x_train, y_train
-gc.collect()
 
 x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
 # Predict the labels of our x_test images

@@ -68,23 +68,31 @@ class AmazonKerasClassifier:
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
     def _train_generator(self, train_files, y_labels, img_resize, batch_size):
+        while True:
+            for i in range(len(train_files)):
+                start_offset = batch_size * i
 
-        for i in range(len(train_files)):
-            batch_features = np.zeros((batch_size, *img_resize, 3))
-            batch_labels = np.zeros((batch_size, len(y_labels[0])))
+                # The last remaining files could be smaller than the batch_size
+                range_offset = min(batch_size, len(train_files) - start_offset)
 
-            offset = batch_size * i
-            for j in range(min(batch_size, len(train_files) - offset)):
-                img = Image.open(train_files[offset + j])
-                img.thumbnail(img_resize)  # Resize the image
+                # If we reached the end of the list then we break the loop
+                if range_offset <= 0:
+                    break
 
-                # Augment the image `img` here
+                batch_features = np.zeros((range_offset, *img_resize, 3))
+                batch_labels = np.zeros((range_offset, len(y_labels[0])))
 
-                # Convert to RGB and normalize
-                img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
-                batch_features[j] = img_array
-                batch_labels[j] = y_labels[offset + j]
-            yield batch_features, batch_labels
+                for j in range(range_offset):
+                    img = Image.open(train_files[start_offset + j])
+                    img.thumbnail(img_resize)  # Resize the image
+
+                    # Augment the image `img` here
+
+                    # Convert to RGB and normalize
+                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                    batch_features[j] = img_array
+                    batch_labels[j] = y_labels[start_offset + j]
+                yield batch_features, batch_labels
 
     def train_model(self, train_files_list, train_labels, val_files_list, val_labels, img_resize,
                     learn_rate=0.001, epoch=5, batch_size=128, train_callbacks=()):
@@ -98,7 +106,6 @@ class AmazonKerasClassifier:
 
         # early stopping will auto-stop training process if model stops learning after 3 epochs
         earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
-
         self.classifier.fit_generator(generator, len(train_files_list) / batch_size,
                                       epochs=epoch,
                                       verbose=1,

@@ -244,8 +244,8 @@ def preprocess_val_files(val_files, val_labels, img_resize=(32, 32), process_cou
     print("Transforming val dataset...")
     with ThreadPoolExecutor(process_count) as pool:
         for img_array, targets in tqdm(pool.map(_val_transform_to_matrices,
-                                                [(file_path, val_labels, img_resize)
-                                                 for file_path, val_labels in zip(val_files, val_labels)]),
+                                                [(file_path, labels, img_resize)
+                                                 for file_path, labels in zip(val_files, val_labels)]),
                                        total=len(val_files)):
             x.append(img_array)
             final_val_labels.append(targets)
