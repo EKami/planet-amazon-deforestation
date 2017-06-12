@@ -38,8 +38,10 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 import data_helper
+from data_helper import AmazonPreprocessor
 from keras_helper import AmazonKerasClassifier
 from kaggle_data.downloader import KaggleDataDownloader
 
@@ -174,19 +176,19 @@ validation_split_size = 0.2
 # <markdowncell>
 
 # # Data preprocessing
-# Due to the hudge amount of memory the preprocessed images can take, we will just retrieve all file names and split them between training and validation sets in this step.
-# The resulting lists won't contain the transformed images but only the file paths.
+# Due to the hudge amount of memory the preprocessed images can take, we will create a dedicated `AmazonPreprocessor` class which job is to preprocess the data right in time at specific steps (training/inference) so that our RAM don't get completely filled by the preprocessed images. 
 
 # <codecell>
 
-X_train, y_train, X_val, y_val, y_map = data_helper.get_train_data_files(train_jpeg_dir, train_csv_file, 
-                                                                         validation_split_size)
+preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional, 
+                                  img_resize, validation_split_size)
+preprocessor.init()
 
 # <codecell>
 
-print("X_train/y_train lenght: {}/{}".format(len(X_train), len(y_train)))
-print("X_val/y_val lenght: {}/{}".format(len(X_val), len(y_val)))
-y_map
+print("X_train/y_train lenght: {}/{}".format(len(preprocessor.X_train), len(preprocessor.y_train)))
+print("X_val/y_val lenght: {}/{}".format(len(preprocessor.X_val), len(preprocessor.y_val)))
+preprocessor.y_map
 
 # <markdowncell>
 
@@ -195,8 +197,6 @@ y_map
 # Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
 # <codecell>
-
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 filepath="weights.best.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
@@ -212,8 +212,8 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 batch_size = 128
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
+epochs_arr = [2, 1] #[10, 5, 5]
+learn_rates = [0.001, 0.0001] #[0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
@@ -223,16 +223,14 @@ learn_rates = [0.001, 0.0001, 0.00001]
 
 # <codecell>
 
-classifier = AmazonKerasClassifier()
+classifier = AmazonKerasClassifier(preprocessor)
 classifier.add_conv_layer(img_resize)
 classifier.add_flatten_layer()
-classifier.add_ann_layer(len(y_map))
+classifier.add_ann_layer(len(preprocessor.y_map))
 
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(X_train, y_train,
-                                                                           X_val, y_val, img_resize,
-                                                                           learn_rate, epochs, batch_size, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
@@ -284,7 +282,7 @@ predictions = classifier.predict(x_test)
 
 # <markdowncell>
 
-# Now lets launch the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
+# Now lets launch the predictions on the additional dataset (updated on 05/05/2017 on Kaggle)
 
 # <codecell>
 
