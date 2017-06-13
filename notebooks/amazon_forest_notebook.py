@@ -170,7 +170,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = None # The resize size of each image ex: (64, 64), None use the default image size
+img_resize = (64, 64) # The resize size of each image ex: (64, 64) or None to use the default image size
 validation_split_size = 0.2
 
 # <markdowncell>
@@ -214,7 +214,7 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <codecell>
 
-batch_size = 64
+batch_size = 128
 epochs_arr = [10, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 
@@ -350,4 +350,4 @@ classifier.close()
 
 # <markdowncell>
 
-# That's it, we're done!
+# #### That's it, we're done!
