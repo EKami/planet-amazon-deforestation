@@ -163,10 +163,12 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Image Resize & Validation split
+# # Image resize & validation split
 # Define the dimensions of the image data trained by the network. Recommended resized images could be 32x32, 64x64, or 128x128 to speedup the training. 
 # 
-# You could also use `None` to use full sized images
+# You could also use `None` to use full sized images.
+# 
+# Be careful, the higher the `validation_split_size` the more RAM you will consume.
 
 # <codecell>
 
@@ -177,6 +179,8 @@ validation_split_size = 0.2
 
 # # Data preprocessing
 # Due to the hudge amount of memory the preprocessed images can take, we will create a dedicated `AmazonPreprocessor` class which job is to preprocess the data right in time at specific steps (training/inference) so that our RAM don't get completely filled by the preprocessed images. 
+# 
+# The only exception to this being the validation dataset as we need to use it as-is for f2 score calculation as well as when we calculate the validation accuracy of each batch.
 
 # <codecell>
 
@@ -286,26 +290,16 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 
 # <markdowncell>
 
-# Before mapping our predictions to their appropriate labels we need to figure out what threshold to take for each class.
-# 
-# To do so we will take the median value of each classes.
+# Before mapping our predictions to their appropriate labels we need to figure out what threshold to take for each class
 
 # <codecell>
 
-# For now we'll just put all thresholds to 0.2 
+# For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
 thresholds = [0.2] * len(labels_set)
-
-# TODO complete
-tags_pred = np.array(predictions).T
-_, axs = plt.subplots(5, 4, figsize=(15, 20))
-axs = axs.ravel()
-
-for i, tag_vals in enumerate(tags_pred):
-    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(preprocessor.y_map[i])
 
 # <markdowncell>
 
-# Now lets map our predictions to their tags and use the thresholds we just retrieved
+# Now lets map our predictions to their tags by using the thresholds
 
 # <codecell>
 
@@ -313,7 +307,7 @@ predicted_labels = classifier.map_predictions(predictions, thresholds)
 
 # <markdowncell>
 
-# Finally lets assemble and visualize our prediction for the test dataset
+# Finally lets assemble and visualize our predictions for the test dataset
 
 # <codecell>
 
