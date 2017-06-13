@@ -63,12 +63,23 @@ class AmazonPreprocessor:
         self.X_val, self.y_val = self._preprocess_val_files()
 
     def get_train_generator(self, batch_size):
+        """
+        Returns a batch generator which transforms chunk of raw images into numpy matrices
+        and then "yield" them for the classifier. Doing so allow to greatly optimize
+        memory usage as the images are processed then deleted by chunks (defined by batch_size)
+        instead of preprocessing them all at once and feeding them to the classifier.
+        :param batch_size: int
+            The batch size
+        :return: generator
+            The batch generator
+        """
+        loop_range = len(self.X_train)
         while True:
-            for i in range(len(self.X_train)):
+            for i in range(loop_range):
                 start_offset = batch_size * i
 
                 # The last remaining files could be smaller than the batch_size
-                range_offset = min(batch_size, len(self.X_train) - start_offset)
+                range_offset = min(batch_size, loop_range - start_offset)
 
                 # If we reached the end of the list then we break the loop
                 if range_offset <= 0:
@@ -78,6 +89,7 @@ class AmazonPreprocessor:
                 batch_labels = np.zeros((range_offset, len(self.y_train[0])))
 
                 for j in range(range_offset):
+                    # Maybe shuffle the index?
                     img = Image.open(self.X_train[start_offset + j])
                     img.thumbnail(self.img_resize)
 
@@ -90,12 +102,24 @@ class AmazonPreprocessor:
                 yield batch_features, batch_labels
 
     def get_prediction_generator(self, batch_size):
+        """
+        Returns a batch generator which transforms chunk of raw images into numpy matrices
+        and then "yield" them for the classifier. Doing so allow to greatly optimize
+        memory usage as the images are processed then deleted by chunks (defined by batch_size)
+        instead of preprocessing them all at once and feeding them to the classifier.
+        :param batch_size: int
+            The batch size
+        :return: generator
+            The batch generator
+        """
+        # NO SHUFFLE HERE as we need our predictions to be in the same order as the inputs
+        loop_range = len(self.X_test_filename)
         while True:
-            for i in range(len(self.X_test_filename)):
+            for i in range(loop_range):
                 start_offset = batch_size * i
 
                 # The last remaining files could be smaller than the batch_size
-                range_offset = min(batch_size, len(self.X_test_filename) - start_offset)
+                range_offset = min(batch_size, loop_range - start_offset)
 
                 # If we reached the end of the list then we break the loop
                 if range_offset <= 0:

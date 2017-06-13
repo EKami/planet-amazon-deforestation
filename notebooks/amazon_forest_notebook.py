@@ -188,6 +188,7 @@ preprocessor.init()
 
 print("X_train/y_train lenght: {}/{}".format(len(preprocessor.X_train), len(preprocessor.y_train)))
 print("X_val/y_val lenght: {}/{}".format(len(preprocessor.X_val), len(preprocessor.y_val)))
+print("X_test/X_test_filename lenght: {}/{}".format(len(preprocessor.X_test), len(preprocessor.X_test_filename)))
 preprocessor.y_map
 
 # <markdowncell>
@@ -214,7 +215,7 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 batch_size = 64
-epochs_arr = [20, 5, 5]
+epochs_arr = [10, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
@@ -278,8 +279,7 @@ fbeta_score
 
 # <codecell>
 
-predictions, x_test_filename = classifier.predict(batch_size) # We use the same number of steps as the batch size
-
+predictions, x_test_filename = classifier.predict(batch_size)
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
@@ -326,6 +326,7 @@ final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_fi
 # <codecell>
 
 final_df = pd.DataFrame(final_data, columns=['image_name', 'tags'])
+print("Predictions rows:", final_df.size)
 final_df.head()
 
 # <codecell>
