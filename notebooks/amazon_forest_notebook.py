@@ -166,7 +166,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (64, 64) # The resize size of each image
+img_resize = (128, 128) # The resize size of each image
 
 # <markdowncell>
 
@@ -217,7 +217,7 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 validation_split_size = 0.2
-batch_size = 128
+batch_size = 64
 
 # <markdowncell>
 
