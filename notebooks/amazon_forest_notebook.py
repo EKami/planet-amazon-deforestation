@@ -38,8 +38,10 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 import data_helper
+from data_helper import AmazonPreprocessor
 from keras_helper import AmazonKerasClassifier
 from kaggle_data.downloader import KaggleDataDownloader
 
@@ -161,39 +163,37 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <markdowncell>
 
-# # Image Resize
-# Define the dimensions of the image data trained by the network. Due to memory constraints we can't load in the full size 256x256 jpg images. Recommended resized images could be 32x32, 64x64, or 128x128.
+# # Image resize & validation split
+# Define the dimensions of the image data trained by the network. Recommended resized images could be 32x32, 64x64, or 128x128 to speedup the training. 
+# 
+# You could also use `None` to use full sized images.
+# 
+# Be careful, the higher the `validation_split_size` the more RAM you will consume.
 
 # <codecell>
 
-img_resize = (128, 128) # The resize size of each image
+img_resize = (64, 64) # The resize size of each image ex: (64, 64) or None to use the default image size
+validation_split_size = 0.2
 
 # <markdowncell>
 
 # # Data preprocessing
-# Preprocess the data in order to fit it into the Keras model.
+# Due to the hudge amount of memory the preprocessed images can take, we will create a dedicated `AmazonPreprocessor` class which job is to preprocess the data right in time at specific steps (training/inference) so that our RAM don't get completely filled by the preprocessed images. 
 # 
-# Due to the hudge amount of memory the resulting matrices will take, the preprocessing will be splitted into several steps:
-#     - Preprocess training data (images and labels) and train the neural net with it
-#     - Delete the training data and call the gc to free up memory
-#     - Preprocess the first testing set
-#     - Predict the first testing set labels
-#     - Delete the first testing set
-#     - Preprocess the second testing set
-#     - Predict the second testing set labels and append them to the first testing set
-#     - Delete the second testing set
+# The only exception to this being the validation dataset as we need to use it as-is for f2 score calculation as well as when we calculate the validation accuracy of each batch.
 
 # <codecell>
 
-x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
-# Free up all available memory space after this heavy operation
-gc.collect();
+preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional, 
+                                  img_resize, validation_split_size)
+preprocessor.init()
 
 # <codecell>
 
-print("x_train shape: {}".format(x_train.shape))
-print("y_train shape: {}".format(y_train.shape))
-y_map
+print("X_train/y_train lenght: {}/{}".format(len(preprocessor.X_train), len(preprocessor.y_train)))
+print("X_val/y_val lenght: {}/{}".format(len(preprocessor.X_val), len(preprocessor.y_val)))
+print("X_test/X_test_filename lenght: {}/{}".format(len(preprocessor.X_test), len(preprocessor.X_test_filename)))
+preprocessor.y_map
 
 # <markdowncell>
 
@@ -203,8 +203,6 @@ y_map
 
 # <codecell>
 
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
-
 filepath="weights.best.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
 
@@ -213,33 +211,33 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # ## Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training. 
+# 
+# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults.
+# 
+# If you opted for a high `img_resize` then you may want to lower the `batch_size` to fit your images matrices into the GPU memory. With an `img_resize` of `(256, 256)` (the default size) and a batch_size of `64` you should at least have a GPU with 8GB or VRAM.
 
 # <codecell>
 
-validation_split_size = 0.2
-batch_size = 64
+batch_size = 128
+epochs_arr = [10, 5, 5]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
 # ## Define and Train model
 # 
 # Here we define the model and begin training. 
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
 
 # <codecell>
 
-classifier = AmazonKerasClassifier()
-classifier.add_conv_layer(img_resize)
+classifier = AmazonKerasClassifier(preprocessor)
+classifier.add_conv_layer()
 classifier.add_flatten_layer()
-classifier.add_ann_layer(len(y_map))
+classifier.add_ann_layer(len(preprocessor.y_map))
 
 train_losses, val_losses = [], []
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
-                                                                           batch_size, validation_split_size=validation_split_size, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
@@ -281,67 +279,35 @@ fbeta_score
 
 # <markdowncell>
 
-# Before launching our predictions lets preprocess the test data and delete the old training data matrices
+# ## Make predictions
 
 # <codecell>
 
-del x_train, y_train
-gc.collect()
-
-x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
-# Predict the labels of our x_test images
-predictions = classifier.predict(x_test)
-
-# <markdowncell>
-
-# Now lets launch the predictions on the additionnal dataset (updated on 05/05/2017 on Kaggle)
-
-# <codecell>
-
-del x_test
-gc.collect()
-
-x_test, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
-new_predictions = classifier.predict(x_test)
-
-del x_test
-gc.collect()
-predictions = np.vstack((predictions, new_predictions))
-x_test_filename = np.hstack((x_test_filename, x_test_filename_additional))
-print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".format(predictions.shape, 
+predictions, x_test_filename = classifier.predict(batch_size)
+print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
-                                                                              predictions[0]))
+                                                                              x_test_filename[0], predictions[0]))
 
 # <markdowncell>
 
-# Before mapping our predictions to their appropriate labels we need to figure out what threshold to take for each class.
-# 
-# To do so we will take the median value of each classes.
+# Before mapping our predictions to their appropriate labels we need to figure out what threshold to take for each class
 
 # <codecell>
 
-# For now we'll just put all thresholds to 0.2 
+# For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
 thresholds = [0.2] * len(labels_set)
 
-# TODO complete
-tags_pred = np.array(predictions).T
-_, axs = plt.subplots(5, 4, figsize=(15, 20))
-axs = axs.ravel()
-
-for i, tag_vals in enumerate(tags_pred):
-    sns.boxplot(tag_vals, orient='v', palette='Set2', ax=axs[i]).set_title(y_map[i])
-
 # <markdowncell>
 
-# Now lets map our predictions to their tags and use the thresholds we just retrieved
+# Now lets map our predictions to their tags by using the thresholds
 
 # <codecell>
 
-predicted_labels = classifier.map_predictions(predictions, y_map, thresholds)
+predicted_labels = classifier.map_predictions(predictions, thresholds)
 
 # <markdowncell>
 
-# Finally lets assemble and visualize our prediction for the test dataset
+# Finally lets assemble and visualize our predictions for the test dataset
 
 # <codecell>
 
@@ -354,6 +320,7 @@ final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_fi
 # <codecell>
 
 final_df = pd.DataFrame(final_data, columns=['image_name', 'tags'])
+print("Predictions rows:", final_df.size)
 final_df.head()
 
 # <codecell>
@@ -377,4 +344,4 @@ classifier.close()
 
 # <markdowncell>
 
-# That's it, we're done!
+# #### That's it, we're done!
