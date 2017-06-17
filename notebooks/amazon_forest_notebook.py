@@ -218,7 +218,7 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <codecell>
 
-batch_size = 128
+batch_size = 64
 epochs_arr = [10, 5, 5]
 learn_rates = [0.001, 0.0001, 0.00001]
 
