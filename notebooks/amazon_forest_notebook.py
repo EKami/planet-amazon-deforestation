@@ -252,7 +252,7 @@ train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train,
 
 # <codecell>
 
-classifier.load_weights("weights.best128.hdf5")
+classifier.load_weights("weights.92.hdf5")
 print("Weights loaded")
 
 # <codecell>
