@@ -5,11 +5,16 @@ from sklearn.metrics import fbeta_score
 from sklearn.model_selection import train_test_split
 
 import tensorflow.contrib.keras.api.keras as k
-from tensorflow.contrib.keras.api.keras.models import Sequential
-from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten
-from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D, BatchNormalization
-from tensorflow.contrib.keras.api.keras.optimizers import Adam
-from tensorflow.contrib.keras.api.keras.callbacks import Callback, EarlyStopping
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from keras.layers.normalization import BatchNormalization
+from keras import initializers
+from keras import regularizers
+from keras.optimizers import Adamax
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.models import load_model
 from tensorflow.contrib.keras import backend
 
 
@@ -30,35 +35,33 @@ class AmazonKerasClassifier:
         self.classifier = Sequential()
 
     def add_conv_layer(self, img_size=(32, 32), img_channels=3):
-        self.classifier.add(BatchNormalization(input_shape=(*img_size, img_channels)))
+        self.classifier.add(BatchNormalization(axis = 1, input_shape=(*img_size, img_channels)))
 
-        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
+        self.classifier.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
+        self.classifier.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(128, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
+        self.classifier.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(256, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
+        self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-
 
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
 
-
     def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(512, activation='relu'))
+        self.classifier.add(Dense(512, kernel_initializer='he_normal', activation='relu'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
@@ -67,40 +70,27 @@ class AmazonKerasClassifier:
         p_valid = classifier.predict(X_valid)
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
-    def train_model(self, x_train, y_train, learn_rate=0.001, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+    def train_model(self, x_train, y_train, learn_rate=0.002, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+
         history = LossHistory()
 
         X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
                                                               test_size=validation_split_size)
 
-
-        #Image Augmentation
-        datagen = ImageDataGenerator(
-                        width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
-                        height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
-                        rotation_range=90,      # randomly rotate images 90 degrees
-                        shear_range=0.1,        # randomly shear images by 10%
-                        zoom_range=0.1,
-                        horizontal_flip=True,
-                        vertical_flip=True) # randomly flip images horizontally
-        datagen.fit(X_train)
-
-        opt = Adam(lr=learn_rate)
+        opt = Adamax(lr=learn_rate)
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
 
-        # early stopping will auto-stop training process if model stops learning after 3 epochs
-        earlyStopping = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')
+        # early stopping will auto-stop training process if model stops learning after 4 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=4, verbose=0, mode='auto')
 
-
-        self.classifier.fit_generator(datagen.flow(X_train, y_train, batch_size=batch_size),
-                                      epochs=epoch,
-                                      verbose=1,
-                                      validation_data=(X_valid, y_valid),
-                                      steps_per_epoch=X_train.shape[0] // batch_size,
-                                      callbacks=[history, *train_callbacks, earlyStopping])
-
+        self.classifier.fit(X_train, y_train,
+                            batch_size=batch_size,
+                            epochs=epoch,
+                            verbose=1,
+                            validation_data=(X_valid, y_valid),
+                            callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
 
@@ -109,6 +99,12 @@ class AmazonKerasClassifier:
 
     def load_weights(self, weight_file_path):
         self.classifier.load_weights(weight_file_path)
+
+    def save_model(self, model_file_path):
+        self.classifier.save(model_file_path)  # creates a HDF5 file 'my_model.h5'
+
+    def load_model(self, model_file_path):
+        self.classifier.load_model(model_file_path)  # loads a HDF5 file 'my_model.h5'
 
     def predict(self, x_test):
         predictions = self.classifier.predict(x_test)

@@ -42,6 +42,7 @@ import matplotlib.image as mpimg
 import data_helper
 from keras_helper import AmazonKerasClassifier
 from kaggle_data.downloader import KaggleDataDownloader
+import keras
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
@@ -166,7 +167,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (64, 64) # The resize size of each image
+img_resize = (128, 128) # The resize size of each image
 
 # <markdowncell>
 
@@ -198,64 +199,57 @@ y_map
 # <markdowncell>
 
 # ## Create a checkpoint
-# 
+
+# <markdowncell>
+
 # Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
 # <codecell>
 
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint
 
-filepath="weights.best.hdf5"
-checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
-
-# <markdowncell>
-
-# ## Choose Hyperparameters
-# 
-# Choose your hyperparameters below for training. 
-
-# <codecell>
-
-validation_split_size = 0.2
-batch_size = 128
+filepath="weights.92.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
 # <markdowncell>
 
-# ## Define and Train model
-# 
-# Here we define the model and begin training. 
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults. 
+# ## Create the neural network definition
 
 # <codecell>
 
+learn_rate = 0.002
+epochs = 10
 classifier = AmazonKerasClassifier()
 classifier.add_conv_layer(img_resize)
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(y_map))
+train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, batch_size, validation_split_size=validation_split_size, train_callbacks=[checkpoint])
 
-train_losses, val_losses = [], []
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, 
-                                                                           batch_size, validation_split_size=validation_split_size, 
-                                                                           train_callbacks=[checkpoint])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
+# <codecell>
+
+learn_rate = 0.0002
+epochs = 5
+train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, batch_size, validation_split_size=validation_split_size, train_callbacks=[checkpoint])
+
+# <codecell>
+
+learn_rate = 0.00002
+epochs = 3
+train_losses, val_losses, fbeta_score = classifier.train_model(x_train, y_train, learn_rate, epochs, batch_size, validation_split_size=validation_split_size, train_callbacks=[checkpoint])
 
 # <markdowncell>
 
 # ## Load Best Weights
 
-# <markdowncell>
+# <codecell>
 
-# Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
+classifier.load_weights("weights.best128.hdf5")
+print("Weights loaded")
 
 # <codecell>
 
-classifier.load_weights("weights.best.hdf5")
-print("Weights loaded")
+# by saving the model we can access it later (almost like a timewarp to get back to the exact same trained model)
+classifier.save_model('128_model.h5')
 
 # <markdowncell>
 
@@ -281,16 +275,242 @@ fbeta_score
 
 # <markdowncell>
 
+# # Pseudo Labeling
+
+# <codecell>
+
+# we need to free up all memory we can for pseudo labeling
+del classifier
+gc.collect()
+
+# <codecell>
+
+# we need to use X_train instead of x_train for pseudo labeling, otherwise we will potentially have duplicate images in validation set
+from sklearn.model_selection import train_test_split
+
+X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2)
+
+# <codecell>
+
+# first we load in the test data
+x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
+
+# we don't want to use all of the test data, only a subset of it
+x_test_trunc = x_test[:20000]
+
+del x_test, x_train
+gc.collect()
+
+#We can now concatenate our pseudo features with the training features
+x_pseudo = np.concatenate([X_train, x_test_trunc])
+del X_train
+gc.collect
+x_pseudo.shape
+
+# <codecell>
+
+# It will be better for memory allocation and more convenient for us to work from our loaded model file here on out. 
+from keras.models import load_model
+
+model = load_model('128_model.h5')
+
+# <codecell>
+
+# Now we predict the labels of our x_test images
+predictions = model.predict(x_test_trunc)
+
+del x_test_trunc
+gc.collect()
+
+predictions_list = [[1 if y > 0.2 else 0 for y in x] for x in predictions]
+
+#Next we concatenate our predictions to our training labels
+y_pseudo = np.concatenate([y_train, predictions_list])
+
+#Now we can safely delete the old training data matrices
+del y_train, predictions, predictions_list
+gc.collect()
+
+y_pseudo.shape
+
+# <markdowncell>
+
+# # Re-train with Pseudo Labeling
+
+# <codecell>
+
+from keras.callbacks import EarlyStopping
+
+earlyStopping = EarlyStopping(monitor='val_loss', patience=4, verbose=0, mode='auto')
+
+filepath="128_model_pseudo.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+
+# <codecell>
+
+from keras.optimizers import Adamax
+
+opt = Adamax(lr=0.002)
+
+model.compile(optimizer=opt, loss='binary_crossentropy', metrics = ['accuracy'])
+
+# <codecell>
+
+model.fit(x_pseudo, y_pseudo, epochs=5, verbose=1, callbacks=[checkpoint, earlyStopping],
+              validation_data=(X_valid, y_valid))
+
+# <codecell>
+
+model.load_weights("128_model_pseudo.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+# continue training at lower learning rate
+opt = Adamax(lr=0.0002)
+
+model.compile(optimizer=opt, loss='binary_crossentropy', metrics = ['accuracy'])
+
+# <codecell>
+
+model.fit(x_pseudo, y_pseudo, epochs=3, verbose=1, callbacks=[checkpoint, earlyStopping],
+              validation_data=(X_valid, y_valid))
+
+# <codecell>
+
+model.load_weights("128_model_pseudo.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+# save our model so we can always go back to it later
+model.save('128_model_pseudo.h5')
+
+# <codecell>
+
+from sklearn.metrics import fbeta_score
+
+def get_fbeta_score(model, X_valid, y_valid):
+    p_valid = model.predict(X_valid)
+    return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
+
+fbeta_score = get_fbeta_score(model, X_valid, y_valid)
+
+fbeta_score
+
+# <markdowncell>
+
+# # Re-train with Augmentation
+
+# <codecell>
+
+filepath="128_model_pseudo_augmented.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+
+# <codecell>
+
+from keras.preprocessing.image import ImageDataGenerator
+
+#Image Augmentation
+datagen = ImageDataGenerator(
+                        width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+                        height_shift_range=0.1,  # randomly shift images vertically (10% of total height)   
+                        horizontal_flip=True,
+                        vertical_flip=True) # randomly flip images horizontally
+datagen.fit(x_pseudo)
+batches = datagen.flow(x_pseudo, y_pseudo, batch_size=64)
+
+# <codecell>
+
+model.fit_generator(batches, epochs=5, verbose=1, callbacks=[checkpoint, earlyStopping], 
+                    validation_data=(X_valid, y_valid), steps_per_epoch=x_pseudo.shape[0] // 64)
+
+# <codecell>
+
+model.load_weights("128_model_pseudo_augmented.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+# Continue training with lower learning rate
+opt = Adamax(lr=0.0002)
+
+model.compile(optimizer=opt, loss='binary_crossentropy', metrics = ['accuracy'])
+
+# <codecell>
+
+model.fit_generator(batches, epochs=3, verbose=1, callbacks=[checkpoint, earlyStopping], 
+                    validation_data=(X_valid, y_valid), steps_per_epoch=x_pseudo.shape[0] // 64)
+
+# <codecell>
+
+model.load_weights("128_model_pseudo_augmented.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+# save our model so we can always go back to it later
+model.save('128_model_pseudo_augmented.h5')
+
+# <markdowncell>
+
+# # Resume Training without pseudo labels
+
+# <codecell>
+
+del x_pseudo, y_pseudo
+gc.collect()
+
+x_train, y_train, y_map = data_helper.preprocess_train_data(train_jpeg_dir, train_csv_file, img_resize)
+# Free up all available memory space after this heavy operation
+gc.collect();
+
+X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2)
+
+del x_train
+gc.collect()
+
+# <codecell>
+
+filepath="128_model_pseudo_augmented_resume.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+
+# <codecell>
+
+datagen = ImageDataGenerator(
+                        width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+                        height_shift_range=0.1,  # randomly shift images vertically (10% of total height)   
+                        horizontal_flip=True,
+                        vertical_flip=True) # randomly flip images horizontally
+datagen.fit(X_train)
+batches = datagen.flow(X_train, y_train, batch_size=64)
+
+# <codecell>
+
+model.fit_generator(batches, epochs=5, verbose=1, callbacks=[checkpoint, earlyStopping], 
+                    validation_data=(X_valid, y_valid), steps_per_epoch=X_train.shape[0] // 64)
+
+# <codecell>
+
+model.load_weights("128_model_pseudo_augmented_resume.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+model.save('128_model_pseudo_augmented_resume.h5')
+
+# <markdowncell>
+
 # Before launching our predictions lets preprocess the test data and delete the old training data matrices
 
 # <codecell>
 
-del x_train, y_train
+del X_train, y_train
 gc.collect()
 
 x_test, x_test_filename = data_helper.preprocess_test_data(test_jpeg_dir, img_resize)
 # Predict the labels of our x_test images
-predictions = classifier.predict(x_test)
+predictions = model.predict(x_test)
 
 # <markdowncell>
 
@@ -302,7 +522,7 @@ del x_test
 gc.collect()
 
 x_test, x_test_filename_additional = data_helper.preprocess_test_data(test_jpeg_additional, img_resize)
-new_predictions = classifier.predict(x_test)
+new_predictions = model.predict(x_test)
 
 del x_test
 gc.collect()
@@ -321,7 +541,11 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions entry:\n{}".
 # <codecell>
 
 # For now we'll just put all thresholds to 0.2 
-thresholds = [0.2] * len(labels_set)
+#thresholds = [0.17] * len(labels_set)
+
+#optimal thresholds
+thresholds = [0.2, 0.2, 0.2, 0.2, 0.2, 0.14, 0.08, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+
 
 # TODO complete
 tags_pred = np.array(predictions).T
@@ -337,7 +561,24 @@ for i, tag_vals in enumerate(tags_pred):
 
 # <codecell>
 
-predicted_labels = classifier.map_predictions(predictions, y_map, thresholds)
+def map_predictions(predictions, labels_map, thresholds):
+        """
+        Return the predictions mapped to their labels
+        :param predictions: the predictions from the predict() method
+        :param labels_map: the map
+        :param thresholds: The threshold of each class to be considered as existing or not existing
+        :return: the predictions list mapped to their labels
+        """
+        predictions_labels = []
+        for prediction in predictions:
+            labels = [labels_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
+            predictions_labels.append(labels)
+
+        return predictions_labels
+
+# <codecell>
+
+predicted_labels = map_predictions(predictions, y_map, thresholds)
 
 # <markdowncell>
 
@@ -373,7 +614,6 @@ sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 # <codecell>
 
 final_df.to_csv('../submission_file.csv', index=False)
-classifier.close()
 
 # <markdowncell>
 
