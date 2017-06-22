@@ -171,6 +171,15 @@ img_resize = (128, 128) # The resize size of each image
 
 # <markdowncell>
 
+# ## Define hyperparameters
+
+# <codecell>
+
+validation_split_size = 0.2
+batch_size = 128
+
+# <markdowncell>
+
 # # Data preprocessing
 # Preprocess the data in order to fit it into the Keras model.
 # 
