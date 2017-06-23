@@ -125,7 +125,7 @@ class AmazonKerasClassifier:
                                       epochs=epoch,
                                       verbose=1,
                                       validation_data=(X_valid, y_valid),
-                                      steps_per_epoch=x_pseudo.shape[0] // batch_size,
+                                      steps_per_epoch=X_train.shape[0] // batch_size,
                                       callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
