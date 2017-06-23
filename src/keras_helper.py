@@ -93,6 +93,43 @@ class AmazonKerasClassifier:
                             callbacks=[history, *train_callbacks, earlyStopping])
         fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
         return [history.train_losses, history.val_losses, fbeta_score]
+    
+    def train_model_augment(self, x_train, y_train, learn_rate=0.002, epoch=5, batch_size=128, validation_split_size=0.2, train_callbacks=()):
+
+        history = LossHistory()
+       
+
+        X_train, X_valid, y_train, y_valid = train_test_split(x_train, y_train,
+                                                              test_size=validation_split_size)
+        
+        
+        #Image Augmentation
+        datagen = ImageDataGenerator(
+                        width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+                        height_shift_range=0.1,  # randomly shift images vertically (10% of total height)   
+                        horizontal_flip=True,
+                        vertical_flip=True) # randomly flip images horizontally
+        datagen.fit(X_train)
+        batches = datagen.flow(X_train, y_train, batch_size=batch_size)
+
+
+        opt = Adamax(lr=learn_rate)
+
+        self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+
+        # early stopping will auto-stop training process if model stops learning after 4 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=4, verbose=0, mode='auto')
+
+        self.classifier.fit_generator(batches,
+                                      epochs=epoch,
+                                      verbose=1,
+                                      validation_data=(X_valid, y_valid),
+                                      steps_per_epoch=x_pseudo.shape[0] // batch_size,
+                                      callbacks=[history, *train_callbacks, earlyStopping])
+        fbeta_score = self._get_fbeta_score(self.classifier, X_valid, y_valid)
+        return [history.train_losses, history.val_losses, fbeta_score]
+    
 
     def save_weights(self, weight_file_path):
         self.classifier.save_weights(weight_file_path)
