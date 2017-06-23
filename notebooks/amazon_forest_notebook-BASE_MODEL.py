@@ -279,12 +279,45 @@ fbeta_score
 
 # <codecell>
 
+# If already pre-trained base model then just start here to load in the weights
+classifier = AmazonKerasClassifier()
+classifier.add_conv_layer(img_resize)
+classifier.add_flatten_layer()
+classifier.add_ann_layer(len(y_map))
+classifier.load_weights("weights.92.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
 filepath="weights.92-augmented.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
 # <codecell>
 
+batch_size = 64
+validation_split_size = 0.2
 
+# <codecell>
+
+learn_rate = 0.002
+epochs = 10
+train_losses, val_losses, fbeta_score = classifier.train_model_augment(x_train, y_train, learn_rate, epochs, batch_size, validation_split_size=validation_split_size, train_callbacks=[checkpoint])
+
+# <codecell>
+
+learn_rate = 0.0002
+epochs = 5
+train_losses, val_losses, fbeta_score = classifier.train_model_augment(x_train, y_train, learn_rate, epochs, batch_size, validation_split_size=validation_split_size, train_callbacks=[checkpoint])
+
+# <codecell>
+
+classifier.load_weights("weights.92-augmented.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+# check fbeta score after augmentation
+fbeta_score
 
 # <markdowncell>
 
