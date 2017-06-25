@@ -310,6 +310,9 @@ predictions_list = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions
 # Now we concatenate our predictions to our training labels
 y_pseudo = np.concatenate([y_train, predictions_list])
 
+# This var will be used to map the new test set predictions to their file names
+x_pseudo_file_names = np.concatenate([X_train, pseudo_y_filename])
+
 y_pseudo.shape
 
 # <markdowncell>
@@ -454,7 +457,7 @@ tags_list = [None] * len(predicted_labels)
 for i, tags in enumerate(predicted_labels):
     tags_list[i] = ' '.join(map(str, tags))
 
-final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_test_filename, tags_list)]
+final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_pseudo_file_names, tags_list)]
 
 # <codecell>
 
