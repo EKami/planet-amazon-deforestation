@@ -57,6 +57,19 @@ class AmazonKerasClassifier:
         self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
+        
+        # This model works a bit better:
+        # self.classifier.add(BatchNormalization(input_shape=(*self.preprocessor.img_resize, img_channels)))
+        #
+        # self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu'))
+        # self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
+        # self.classifier.add(MaxPooling2D(pool_size=2))
+        # self.classifier.add(Dropout(0.25))
+        #
+        # self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
+        # self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
+        # self.classifier.add(MaxPooling2D(pool_size=2))
+        # self.classifier.add(Dropout(0.25))
 
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
