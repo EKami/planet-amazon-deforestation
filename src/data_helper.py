@@ -8,6 +8,7 @@ from PIL import Image
 from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
+from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
 
 
 class AmazonPreprocessor:
@@ -62,18 +63,36 @@ class AmazonPreprocessor:
         # The validation data cannot be preprocessed in batches as we also need them to compute the f2 score
         self.X_val, self.y_val = self._preprocess_val_files()
 
-    def get_train_generator(self, batch_size):
+    def get_train_generator(self, X_train_files, y_train_files, batch_size, augment_data=False):
         """
         Returns a batch generator which transforms chunk of raw images into numpy matrices
         and then "yield" them for the classifier. Doing so allow to greatly optimize
         memory usage as the images are processed then deleted by chunks (defined by batch_size)
         instead of preprocessing them all at once and feeding them to the classifier.
+        :param y_train_files: list
+            List of the one-hot encoded classes
+        :param X_train_files: list
+            List of paths to the train files
+        :param augment_data: boolean
+            False to not augment data
+            True to augment data
         :param batch_size: int
             The batch size
         :return: generator
             The batch generator
         """
-        loop_range = len(self.X_train)
+        assert len(X_train_files) == len(y_train_files)
+        # Image Augmentation
+        datagen = ImageDataGenerator(
+            width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+            height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
+            #rotation_range=90,  # randomly rotate images 90 degrees
+            #shear_range=0.1,  # randomly shear images by 10%
+            #zoom_range=0.1,
+            horizontal_flip=True,
+            vertical_flip=True)  # randomly flip images horizontally
+
+        loop_range = len(X_train_files)
         while True:
             for i in range(loop_range):
                 start_offset = batch_size * i
@@ -86,11 +105,11 @@ class AmazonPreprocessor:
                     break
 
                 batch_features = np.zeros((range_offset, *self.img_resize, 3))
-                batch_labels = np.zeros((range_offset, len(self.y_train[0])))
+                batch_labels = np.zeros((range_offset, len(y_train_files[0])))
 
                 for j in range(range_offset):
                     # Maybe shuffle the index?
-                    img = Image.open(self.X_train[start_offset + j])
+                    img = Image.open(X_train_files[start_offset + j])
                     img.thumbnail(self.img_resize)
 
                     # Augment the image `img` here
@@ -98,22 +117,29 @@ class AmazonPreprocessor:
                     # Convert to RGB and normalize
                     img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
                     batch_features[j] = img_array
-                    batch_labels[j] = self.y_train[start_offset + j]
-                yield batch_features, batch_labels
+                    batch_labels[j] = y_train_files[start_offset + j]
+                if augment_data:
+                    # Here the next batch of the data generator (and only one for this iteration)
+                    # is taken and returned in the yield statement
+                    yield next(datagen.flow(batch_features, batch_labels, range_offset))
+                else:
+                    yield batch_features, batch_labels
 
-    def get_prediction_generator(self, batch_size):
+    def get_prediction_generator(self, batch_size, filename_list):
         """
         Returns a batch generator which transforms chunk of raw images into numpy matrices
         and then "yield" them for the classifier. Doing so allow to greatly optimize
         memory usage as the images are processed then deleted by chunks (defined by batch_size)
         instead of preprocessing them all at once and feeding them to the classifier.
+        :param filename_list: list
+            The list of files on which you want to do your predictions
         :param batch_size: int
             The batch size
         :return: generator
             The batch generator
         """
         # NO SHUFFLE HERE as we need our predictions to be in the same order as the inputs
-        loop_range = len(self.X_test_filename)
+        loop_range = len(filename_list)
         while True:
             for i in range(loop_range):
                 start_offset = batch_size * i
@@ -128,7 +154,7 @@ class AmazonPreprocessor:
                 img_arrays = np.zeros((range_offset, *self.img_resize, 3))
 
                 for j in range(range_offset):
-                    img = Image.open(self.X_test_filename[start_offset + j])
+                    img = Image.open(filename_list[start_offset + j])
                     img.thumbnail(self.img_resize)
 
                     # Augment the image `img` here

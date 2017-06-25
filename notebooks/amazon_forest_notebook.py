@@ -38,6 +38,7 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from keras.models import load_model
 from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 import data_helper
@@ -172,7 +173,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (64, 64) # The resize size of each image ex: (64, 64) or None to use the default image size
+img_resize = (128, 128) # The resize size of each image ex: (64, 64) or None to use the default image size
 validation_split_size = 0.2
 
 # <markdowncell>
@@ -203,7 +204,7 @@ preprocessor.y_map
 
 # <codecell>
 
-filepath="weights.best.hdf5"
+filepath="best_original_weights.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
 
 # <markdowncell>
@@ -219,12 +220,12 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 batch_size = 128
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
+epochs_arr = [10, 5, 3]
+learn_rates = [0.002, 0.0002, 0.00002]
 
 # <markdowncell>
 
-# ## Define and Train model
+# # Define and Train model
 # 
 # Here we define the model and begin training. 
 
@@ -237,7 +238,10 @@ classifier.add_ann_layer(len(preprocessor.y_map))
 
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(preprocessor.X_train, 
+                                                                           preprocessor.y_train,
+                                                                           learn_rate, epochs, batch_size,
+                                                                           augment_data=False,
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
@@ -252,7 +256,7 @@ for learn_rate, epochs in zip(learn_rates, epochs_arr):
 
 # <codecell>
 
-classifier.load_weights("weights.best.hdf5")
+classifier.load_weights("best_original_weights.hdf5")
 print("Weights loaded")
 
 # <markdowncell>
@@ -279,11 +283,146 @@ fbeta_score
 
 # <markdowncell>
 
+# # Pseudo labeling
+
+# <markdowncell>
+
+# To do pseudo labeling we'll start by merging our training data with a subset of the test set.
+# Below we merge the **paths** where the files are located, not the actual data. Using directly the data would eat up too much memory.
+
+# <codecell>
+
+# We don't want to use all of the test data, only a subset of it
+x_test_trunc = preprocessor.X_test_filename[:20000]
+
+# We can now concatenate our pseudo features with the training features
+x_pseudo_file_names = np.concatenate([preprocessor.X_train, x_test_trunc])
+x_pseudo_file_names.shape
+
+# <codecell>
+
+# Now we predict the labels of our x_pseudo_file_names set
+pseudo_predictions, pseudo_y_filename = classifier.predict(x_pseudo_file_names, batch_size)
+
+# We use the 0.2 threshold to make predictions one-hot encoded
+predictions_list = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions]
+
+# Now we concatenate our predictions to our training labels
+y_pseudo = np.concatenate([y_train, predictions_list])
+
+y_pseudo.shape
+
+# <markdowncell>
+
+# ## Re-train with Pseudo Labeling
+# 
+# We take the same model from before and train it against pseudo labeled images
+
+# <codecell>
+
+checkpoint = ModelCheckpoint("pseudo_labeling_weights.hdf5", monitor='val_acc', 
+                             verbose=1, save_best_only=True, mode='max')
+
+# <markdowncell>
+
+# Here we will retrain using the pseudo labeling dataset
+
+# <codecell>
+
+epochs_arr = [5, 3]
+learn_rates = [0.002, 0.0002]
+
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
+                                                                           learn_rate, epochs, batch_size=128, 
+                                                                           augment_data=False, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
+
+# <markdowncell>
+
+# ## Load Best Weights from Pseudo Labeling
+
+# <codecell>
+
+classifier.load_weights("pseudo_labeling_weights.hdf5")
+print("Weights loaded")
+
+# <markdowncell>
+
+# ## Plot the loss change
+
+# <codecell>
+
+plt.plot(train_losses, label='Training loss')
+plt.plot(val_losses, label='Validation loss')
+plt.legend();
+
+# <markdowncell>
+
+# And get the fbeta score
+
+# <codecell>
+
+fbeta_score
+
+# <markdowncell>
+
+# ## Re-train with Augmentation
+
+# <codecell>
+
+checkpoint = ModelCheckpoint("pseudo_labeling_with_augment_weights.hdf5", monitor='val_acc', 
+                             verbose=1, save_best_only=True, mode='max')
+
+# <codecell>
+
+epochs_arr = [5, 3]
+learn_rates = [0.002, 0.0002]
+
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
+                                                                           learn_rate, epochs, batch_size=128, 
+                                                                           augment_data=True, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
+
+# <markdowncell>
+
+# ## Load Best Weights from Pseudo Labeling with augmentation
+
+# <codecell>
+
+classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
+print("Weights loaded")
+
+# <markdowncell>
+
+# ## Plot the loss change
+
+# <codecell>
+
+plt.plot(train_losses, label='Training loss')
+plt.plot(val_losses, label='Validation loss')
+plt.legend();
+
+# <markdowncell>
+
+# And finally get the final f2 score
+
+# <codecell>
+
+fbeta_score
+
+# <markdowncell>
+
 # ## Make predictions
 
 # <codecell>
 
-predictions, x_test_filename = classifier.predict(batch_size)
+predictions, x_test_filename = classifier.predict(preprocessor.X_test_filename, batch_size)
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
