@@ -308,10 +308,10 @@ pseudo_predictions, pseudo_y_filename = classifier.predict(x_pseudo_file_names, 
 predictions_list = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions]
 
 # Now we concatenate our predictions to our training labels
-y_pseudo = np.concatenate([y_train, predictions_list])
+y_pseudo = np.concatenate([preprocessor.y_train, predictions_list])
 
 # This var will be used to map the new test set predictions to their file names
-x_pseudo_file_names = np.concatenate([X_train, pseudo_y_filename])
+x_pseudo_file_names = np.concatenate([preprocessor.X_train, pseudo_y_filename])
 
 y_pseudo.shape
 
@@ -337,7 +337,7 @@ learn_rates = [0.002, 0.0002]
 
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
-                                                                           learn_rate, epochs, batch_size=128, 
+                                                                           learn_rate, epochs, batch_size, 
                                                                            augment_data=False, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
@@ -386,7 +386,7 @@ learn_rates = [0.002, 0.0002]
 
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
-                                                                           learn_rate, epochs, batch_size=128, 
+                                                                           learn_rate, epochs, batch_size=64, 
                                                                            augment_data=True, 
                                                                            train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
@@ -421,7 +421,52 @@ fbeta_score
 
 # <markdowncell>
 
-# ## Make predictions
+# ## Resume Training without pseudo labels
+
+# <codecell>
+
+checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
+                             verbose=1, save_best_only=True, mode='max')
+
+# <codecell>
+
+epochs_arr = [5]
+learn_rates = [0.002]
+
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
+                                                                           learn_rate, epochs, batch_size=64, 
+                                                                           augment_data=True, 
+                                                                           train_callbacks=[checkpoint])
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
+
+# <markdowncell>
+
+# ## Load Best Weights from original training set with augmentation
+
+# <codecell>
+
+classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
+print("Weights loaded")
+
+# <markdowncell>
+
+# ## Plot the loss change
+
+# <codecell>
+
+plt.plot(train_losses, label='Training loss')
+plt.plot(val_losses, label='Validation loss')
+plt.legend();
+
+# <codecell>
+
+fbeta_score
+
+# <markdowncell>
+
+# ## Make final predictions
 
 # <codecell>
 
@@ -457,7 +502,7 @@ tags_list = [None] * len(predicted_labels)
 for i, tags in enumerate(predicted_labels):
     tags_list[i] = ' '.join(map(str, tags))
 
-final_data = [[filename.split(".")[0], tags] for filename, tags in zip(x_pseudo_file_names, tags_list)]
+final_data = [[filename.split("/")[-1].split(".")[0], tags] for filename, tags in zip(x_test_filename, tags_list)]
 
 # <codecell>
 

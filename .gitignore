@@ -3,7 +3,11 @@ input/*
 submission_file.csv
 notebooks/amazon_forest_notebook.ipynb
 notebooks/weights.best.hdf5
-
+notebooks/best_original_weights.hdf5
+notebooks/original_with_augment_weights.hdf5
+notebooks/pseudo_labeling_weights.hdf5
+notebooks/pseudo_labeling_with_augment_weights.hdf5
+				
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
