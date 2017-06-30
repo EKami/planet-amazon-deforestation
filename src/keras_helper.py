@@ -10,7 +10,7 @@ import tensorflow.contrib.keras.api.keras as k
 from tensorflow.contrib.keras.api.keras.models import Sequential
 from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten
 from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D, BatchNormalization
-from tensorflow.contrib.keras.api.keras.optimizers import Adam
+from tensorflow.contrib.keras.api.keras.optimizers import Adam, Adamax
 from tensorflow.contrib.keras.api.keras.callbacks import Callback, EarlyStopping
 from tensorflow.contrib.keras import backend
 
@@ -36,13 +36,31 @@ class AmazonKerasClassifier:
         img_channels = 3
         self.classifier.add(BatchNormalization(input_shape=(*self.preprocessor.img_resize, img_channels)))
 
-        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-        self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
+        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(MaxPooling2D(pool_size=2))
+        self.classifier.add(Dropout(0.25))
+
+        self.classifier.add(Conv2D(128, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(MaxPooling2D(pool_size=2))
+        self.classifier.add(Dropout(0.25))
+
+        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
@@ -50,7 +68,7 @@ class AmazonKerasClassifier:
         self.classifier.add(Flatten())
 
     def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(512, activation='relu'))
+        self.classifier.add(Dense(512, activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
@@ -63,7 +81,7 @@ class AmazonKerasClassifier:
         history = LossHistory()
         train_generator = self.preprocessor.get_train_generator(batch_size)
         X_val, y_val = self.preprocessor.X_val, self.preprocessor.y_val
-        opt = Adam(lr=learn_rate)
+        opt = Adamax(lr=learn_rate)
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
