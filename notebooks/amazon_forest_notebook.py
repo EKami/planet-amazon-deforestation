@@ -219,8 +219,8 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 # <codecell>
 
 batch_size = 64
-epochs_arr = [20, 10, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
+epochs_arr = [25, 10, 5]
+learn_rates = [0.002, 0.0002, 0.00002]
 
 # <markdowncell>
 
@@ -295,7 +295,10 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 # <codecell>
 
 # For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
-thresholds = [0.2] * len(labels_set)
+#thresholds = [0.2] * len(labels_set)
+
+#optimized thresholds
+thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
 
 # <markdowncell>
 
