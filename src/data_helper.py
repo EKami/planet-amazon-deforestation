@@ -78,9 +78,7 @@ class AmazonPreprocessor:
         datagen = ImageDataGenerator(
             width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
             height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
-            rotation_range=90,  # randomly rotate images 90 degrees
-            shear_range=0.1,  # randomly shear images by 10%
-            zoom_range=0.1,
+            zoom_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
         loop_range = len(self.X_train)
