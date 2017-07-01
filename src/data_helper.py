@@ -8,6 +8,7 @@ from PIL import Image
 from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
+from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
 
 
 class AmazonPreprocessor:
@@ -73,6 +74,13 @@ class AmazonPreprocessor:
         :return: generator
             The batch generator
         """
+        # Image Augmentation
+        datagen = ImageDataGenerator(
+            width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+            height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
+            zoom_range=0.2,
+            horizontal_flip=True,
+            vertical_flip=True)  # randomly flip images horizontally
         loop_range = len(self.X_train)
         while True:
             for i in range(loop_range):
@@ -99,7 +107,11 @@ class AmazonPreprocessor:
                     img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
                     batch_features[j] = img_array
                     batch_labels[j] = self.y_train[start_offset + j]
-                yield batch_features, batch_labels
+
+                # Augment the images (using Keras allow us to add randomization/shuffle to augmented images)
+                # Here the next batch of the data generator (and only one for this iteration)
+                # is taken and returned in the yield statement
+                yield next(datagen.flow(batch_features, batch_labels, range_offset))
 
     def get_prediction_generator(self, batch_size):
         """

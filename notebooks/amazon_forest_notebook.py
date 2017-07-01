@@ -172,7 +172,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (64, 64) # The resize size of each image ex: (64, 64) or None to use the default image size
+img_resize = (128, 128) # The resize size of each image ex: (64, 64) or None to use the default image size
 validation_split_size = 0.2
 
 # <markdowncell>
@@ -218,9 +218,9 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <codecell>
 
-batch_size = 128
-epochs_arr = [10, 5, 5]
-learn_rates = [0.001, 0.0001, 0.00001]
+batch_size = 64
+epochs_arr = [35, 15, 5]
+learn_rates = [0.002, 0.0002, 0.00002]
 
 # <markdowncell>
 
@@ -295,7 +295,12 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 # <codecell>
 
 # For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
-thresholds = [0.2] * len(labels_set)
+#thresholds = [0.2] * len(labels_set)
+
+
+# <codecell>
+
+thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
 
 # <markdowncell>
 
