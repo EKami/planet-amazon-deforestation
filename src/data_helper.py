@@ -185,23 +185,22 @@ class AmazonPreprocessor:
 
         y_train = []
         for f,tags in (train.values):
-            targets = np.zeros(17)
+            targets = np.zeros(len(label_map))
             for t in tags.split(' '):
                 targets[label_map[t]] = 1
             y_train.append(targets)
 
         y_train = np.array(y_train, np.uint8)
-        #limit = int(len(files_path) * (1 - self.validation_split))
         trn_index = []
         val_index = []
         index = np.arange(len(train))
-        for i in (range(0,17)):
+        for i in (range(len(label_map))):
             sss = StratifiedShuffleSplit(n_splits=2, test_size=self.validation_split, random_state=i)
             for train_index, test_index in sss.split(index,y_train[:,i]):
                 X_train, X_test = index[train_index], index[test_index]
             # to ensure there is no repetetion within each split and between the splits
-            trn_index = trn_index + list(set(list(X_train)) - set(trn_index) - set(val_index))
-            val_index = val_index + list(set(list(X_test)) - set(val_index) - set(trn_index))
+            trn_index = trn_index + list(set(X_train) - set(trn_index) - set(val_index))
+            val_index = val_index + list(set(X_test) - set(val_index) - set(trn_index))
         return np.array(trn_index), np.array(val_index)
 
     def _get_train_data_files(self):
