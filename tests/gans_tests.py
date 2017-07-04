@@ -25,5 +25,5 @@ class TestGans:
         gans.add_generator()
         gans.add_discriminator_model()
         gans.add_adversarial_model()
-        #gans.train()
+        gans.train()
         print("Dir", train_jpeg_dir)
