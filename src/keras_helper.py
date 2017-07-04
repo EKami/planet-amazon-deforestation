@@ -6,7 +6,7 @@ import data_helper
 from sklearn.metrics import fbeta_score
 from PIL import Image
 
-import tensorflow.contrib.keras.api.keras as k
+import keras as k
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
@@ -17,7 +17,7 @@ from keras.optimizers import Adamax
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import load_model
-from tensorflow.contrib.keras import backend
+from keras import backend
 
 
 class LossHistory(Callback):
