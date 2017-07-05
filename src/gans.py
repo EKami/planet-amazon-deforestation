@@ -1,10 +1,9 @@
-import numpy as np
 import os
-import random
+import numpy as np
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers import Conv2D
 from keras.layers.convolutional import UpSampling2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
@@ -13,6 +12,8 @@ from keras.optimizers import RMSprop
 from keras.layers.core import Reshape
 
 from src.data_helper import AmazonPreprocessor
+
+import matplotlib.pyplot as plt
 
 
 class Gans:
@@ -24,9 +25,12 @@ class Gans:
         self.preprocessor = preprocessor
         self.img_channels = 3
         self.z_vector_size = z_vector_size
+        current_path = os.path.dirname(__file__)
+        self.generated_images_path = os.path.join(current_path, "../input/generated")
+        self.generated_labels_file = os.path.join(current_path, "../input/generated.csv")
 
     def is_images_already_generated(self):
-        return False
+        return os.path.exists(self.generated_images_path) and os.path.exists(self.generated_labels_file)
 
     def add_discriminator(self, output_size):
         dropout = 0.4
@@ -99,30 +103,47 @@ class Gans:
         self.adversarial_model.add(self.discriminator)
         self.adversarial_model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-    def train(self, epoch=1, batch_size=32, train_callbacks=()):
+    def train(self, epoch=3, batch_size=32, train_callbacks=()):
         # TODO remove the validation set
         train_generator = self.preprocessor.get_train_generator(batch_size)
 
-        for i in range(int(len(self.preprocessor.X_train) / batch_size)):
-            images_train, labels_real = next(train_generator)
-            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
+        for e in range(epoch):
+            #for i in range(batch_size * 6):
+            for i in range(int(len(self.preprocessor.X_train) / batch_size)):
+                images_train, labels_real = next(train_generator)
+                noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
 
-            images_fake = self.generator.predict(noise)
-            labels_fake = np.zeros([labels_real.shape[0], labels_real.shape[1] + 1])
+                images_fake = self.generator.predict(noise)
+                labels_fake = np.zeros([labels_real.shape[0], labels_real.shape[1] + 1])
 
-            # Add 1 class to the fake labels as fake
-            labels_fake[:, len(labels_fake[0]) - 1] = 1
-            # Add 0 at the end of each onehot vector for real images
-            labels_real = np.column_stack((labels_real, [0] * batch_size))
+                # Add 1 class to the fake labels as fake
+                labels_fake[:, len(labels_fake[0]) - 1] = 1
+                # Add 0 at the end of each onehot vector for real images
+                labels_real = np.column_stack((labels_real, [0] * batch_size))
 
-            x = np.concatenate((images_train, images_fake))
-            y = np.concatenate((labels_real, labels_fake))
+                x = np.concatenate((images_train, images_fake))
+                y = np.concatenate((labels_real, labels_fake))
 
-            d_loss = self.discriminator_model.train_on_batch(x, y)
+                d_loss = self.discriminator_model.train_on_batch(x, y)
 
-            y = np.ones([batch_size, labels_fake.shape[1]])
-            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
-            a_loss = self.adversarial_model.train_on_batch(noise, y)
-            log_mesg = "%d: [D loss: %f, acc: %f]" % (i, d_loss[0], d_loss[1])
-            log_mesg = "%s  [A loss: %f, acc: %f]" % (log_mesg, a_loss[0], a_loss[1])
-            print(log_mesg)
+                y = np.ones([batch_size, labels_fake.shape[1]])
+                noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
+                a_loss = self.adversarial_model.train_on_batch(noise, y)
+                log_mesg = "%d: [D loss: %f, acc: %f]" % (i, d_loss[0], d_loss[1])
+                log_mesg = "%s  [A loss: %f, acc: %f]" % (log_mesg, a_loss[0], a_loss[1])
+                print(log_mesg)
+
+        noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
+        images_fake = self.generator.predict(noise)
+        labels_fake = self.discriminator_model.predict(images_fake)
+        print("Labels fake result 1:", labels_fake[0])
+
+        plt.rc('axes', grid=False)
+        _, axs = plt.subplots(3, 4, sharex='col', sharey='row', figsize=(64, 64))
+        axs = axs.ravel()
+
+        for i in range(12):
+            axs[i].imshow(images_fake[i])
+
+        plt.show()
+
