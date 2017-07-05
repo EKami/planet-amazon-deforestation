@@ -13,8 +13,6 @@ from keras.optimizers import RMSprop
 from keras.layers.core import Reshape
 
 from src.data_helper import AmazonPreprocessor
-from src.keras_helper import LossHistory
-import src.data_helper
 
 
 class Gans:
@@ -52,7 +50,8 @@ class Gans:
 
         # Out: 1-dim probability
         self.discriminator.add(Flatten())
-        self.discriminator.add(Dense(output_size, activation='sigmoid'))
+        # +1 because the last column is to classify fake data
+        self.discriminator.add(Dense(output_size + 1, activation='sigmoid'))
         self.generator.summary()
 
     def add_generator(self):
@@ -87,7 +86,6 @@ class Gans:
 
         self.generator.add(Conv2DTranspose(self.img_channels, 5, padding='same'))
         self.generator.add(Activation('sigmoid'))
-        self.generator.summary()
 
     def add_discriminator_model(self):
         optimizer = RMSprop(lr=0.0002, decay=6e-8)
@@ -101,14 +99,11 @@ class Gans:
         self.adversarial_model.add(self.discriminator)
         self.adversarial_model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-    def train(self, epoch=1, batch_size=128, train_callbacks=()):
+    def train(self, epoch=1, batch_size=32, train_callbacks=()):
         # TODO remove the validation set
-
-        discriminator_history: LossHistory = LossHistory()
-        adversarial_history: LossHistory = LossHistory()
         train_generator = self.preprocessor.get_train_generator(batch_size)
 
-        for i in range(epoch):
+        for i in range(int(len(self.preprocessor.X_train) / batch_size)):
             images_train, labels_real = next(train_generator)
             noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
 
@@ -118,19 +113,16 @@ class Gans:
             # Add 1 class to the fake labels as fake
             labels_fake[:, len(labels_fake[0]) - 1] = 1
             # Add 0 at the end of each onehot vector for real images
-            labels_real = np.column_stack((labels_real, [0] * 128))
+            labels_real = np.column_stack((labels_real, [0] * batch_size))
 
             x = np.concatenate((images_train, images_fake))
             y = np.concatenate((labels_real, labels_fake))
 
-            d_loss = self.discriminator.train_on_batch(x, y)
+            d_loss = self.discriminator_model.train_on_batch(x, y)
 
-            y = np.ones([batch_size, 1])
-            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
+            y = np.ones([batch_size, labels_fake.shape[1]])
+            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
             a_loss = self.adversarial_model.train_on_batch(noise, y)
             log_mesg = "%d: [D loss: %f, acc: %f]" % (i, d_loss[0], d_loss[1])
             log_mesg = "%s  [A loss: %f, acc: %f]" % (log_mesg, a_loss[0], a_loss[1])
             print(log_mesg)
-            if save_interval > 0:
-                if (i + 1) % save_interval == 0:
-                    self.plot_images(save2file=True, samples=noise_input.shape[0], noise=noise_input, step=(i + 1))
