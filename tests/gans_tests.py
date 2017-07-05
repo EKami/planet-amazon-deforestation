@@ -1,12 +1,6 @@
-import sys
-import pandas as pd
-
-sys.path.append('../src')
-sys.path.append('../tests')
-import data_helper
-from gans import Gans
-from data_helper import AmazonPreprocessor
-
+from src.data_helper import AmazonPreprocessor
+from src.data_helper import get_jpeg_data_files_paths
+from src.gans import Gans
 
 class TestGans:
     """
@@ -16,7 +10,7 @@ class TestGans:
 
     def test_gans(self):
         img_resize = None
-        train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file = data_helper.get_jpeg_data_files_paths()
+        train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file = get_jpeg_data_files_paths()
         preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional,
                                           img_resize, validation_split=0.1)
         preprocessor.init()
@@ -27,3 +21,6 @@ class TestGans:
         gans.add_adversarial_model()
         gans.train()
         print("Dir", train_jpeg_dir)
+
+t = TestGans()
+t.test_gans()

@@ -2,7 +2,6 @@ import numpy as np
 import os
 import random
 
-import data_helper
 from sklearn.metrics import fbeta_score
 from PIL import Image
 
