@@ -22,10 +22,15 @@ class TestGans:
         gans.add_generator()
         gans.add_discriminator_model()
         gans.add_adversarial_model()
-        gans.train()
+        d_loss, a_loss = gans.train()
         images_generated, labels_generated = gans.generate(30)
 
         print("Labels fake result 1:", labels_generated[0])
+
+        plt.plot(d_loss[1], label='Discriminator accuracy')
+        plt.plot(a_loss[1], label='Adversarial accuracy')
+        plt.legend()
+        plt.show()
 
         plt.rc('axes', grid=False)
         _, axs = plt.subplots(3, 4, sharex='col', sharey='row', figsize=(64, 64))

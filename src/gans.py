@@ -32,7 +32,7 @@ class Gans:
         return os.path.exists(self.generated_images_path) and os.path.exists(self.generated_labels_file)
 
     def add_discriminator(self, output_size):
-        dropout = 0.3
+        dropout = 0.2
         self.discriminator.add(Conv2D(64, 5, strides=2,
                                       input_shape=(*self.preprocessor.img_resize, self.img_channels),
                                       padding='same'))
@@ -55,10 +55,9 @@ class Gans:
         self.discriminator.add(Flatten())
         # +1 because the last column is to classify fake data
         self.discriminator.add(Dense(output_size + 1, activation='sigmoid'))
-        self.generator.summary()
 
     def add_generator(self):
-        dropout = 0.3
+        dropout = 0.2
         depth = 64 * 4
         initial_width = int(self.preprocessor.img_resize[0] / 4)
         initial_height = int(self.preprocessor.img_resize[1] / 4)
@@ -108,8 +107,7 @@ class Gans:
         a_loss = []
 
         for e in range(epoch):
-            print("Epoch {}".format(e + 1))
-            for i in tqdm(range(int(len(self.preprocessor.X_train) / batch_size))):
+            for i in tqdm(range(int(len(self.preprocessor.X_train) / batch_size)), desc="Epoch {}".format(e + 1)):
                 images_train, labels_real = next(train_generator)
                 noise = np.random.uniform(-1.0, 1.0, size=[batch_size, self.z_vector_size])
 
