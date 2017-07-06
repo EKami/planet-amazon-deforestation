@@ -12,7 +12,7 @@ class TestGans:
         img_resize = None
         train_jpeg_dir, test_jpeg_dir, test_jpeg_additional, train_csv_file = get_jpeg_data_files_paths()
         preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional,
-                                          img_resize, validation_split=0.1)
+                                          img_resize, validation_split=0)
         preprocessor.init()
         gans = Gans(preprocessor)
         gans.add_discriminator(17)

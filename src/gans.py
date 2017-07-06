@@ -103,7 +103,7 @@ class Gans:
         self.adversarial_model.add(self.discriminator)
         self.adversarial_model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-    def train(self, epoch=3, batch_size=32, train_callbacks=()):
+    def train(self, epoch=1, batch_size=32, train_callbacks=()):
         # TODO remove the validation set
         train_generator = self.preprocessor.get_train_generator(batch_size)
 

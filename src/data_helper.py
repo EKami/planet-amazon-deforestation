@@ -181,7 +181,6 @@ class AmazonPreprocessor:
         flatten = lambda l: [item for sublist in l for item in sublist]
         labels = list(set(flatten([l.split(' ') for l in train['tags'].values])))
         label_map = {l: i for i, l in enumerate(labels)}
-        inv_label_map = {i: l for l, i in label_map.items()}
 
         y_train = []
         for f,tags in (train.values):
@@ -198,7 +197,7 @@ class AmazonPreprocessor:
             sss = StratifiedShuffleSplit(n_splits=2, test_size=self.validation_split, random_state=i)
             for train_index, test_index in sss.split(index,y_train[:,i]):
                 X_train, X_test = index[train_index], index[test_index]
-            # to ensure there is no repetetion within each split and between the splits
+            # to ensure there is no repetition within each split and between the splits
             trn_index = trn_index + list(set(X_train) - set(trn_index) - set(val_index))
             val_index = val_index + list(set(X_test) - set(val_index) - set(trn_index))
         return np.array(trn_index), np.array(val_index)
@@ -216,14 +215,18 @@ class AmazonPreprocessor:
             files_path.append('{}/{}.jpg'.format(self.train_jpeg_dir, file_name))
             tags_list.append(tags)
 
-        trn_index, val_index = self._get_validation_split()
+        if self.validation_split != 0:
+            trn_index, val_index = self._get_validation_split()
 
-        for index in trn_index:
-            train_files.append(files_path[index])
-            train_tags.append(tags_list[index])
-        for index in val_index:
-            val_files.append(files_path[index])
-            val_tags.append(tags_list[index])
+            for index in trn_index:
+                train_files.append(files_path[index])
+                train_tags.append(tags_list[index])
+            for index in val_index:
+                val_files.append(files_path[index])
+                val_tags.append(tags_list[index])
+        else:
+            train_files = files_path
+            train_tags = tags_list
 
         labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         y_map = {l: i for i, l in enumerate(labels)}
@@ -236,13 +239,14 @@ class AmazonPreprocessor:
                 x_train_files.append(file_name)
                 y_train_files.append(targets)
 
-        with ThreadPoolExecutor(self.process_count) as pool:
-            for file_name, targets in tqdm(pool.map(self._get_class_mapping,
-                                                    [(file_name, tags, y_map)
-                                                     for file_name, tags in zip(val_files, val_tags)]),
-                                           total=len(val_files)):
-                x_val_files.append(file_name)
-                y_val_files.append(targets)
+        if self.validation_split != 0:
+            with ThreadPoolExecutor(self.process_count) as pool:
+                for file_name, targets in tqdm(pool.map(self._get_class_mapping,
+                                                        [(file_name, tags, y_map)
+                                                        for file_name, tags in zip(val_files, val_tags)]),
+                                               total=len(val_files)):
+                    x_val_files.append(file_name)
+                    y_val_files.append(targets)
 
         return [x_train_files, y_train_files, x_val_files, y_val_files, {v: k for k, v in y_map.items()}]
 
