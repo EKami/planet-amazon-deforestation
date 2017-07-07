@@ -38,7 +38,7 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from keras.callbacks import ModelCheckpoint, EarlyStopping, History, CSVLogger
+from keras.callbacks import ModelCheckpoint, CSVLogger
 
 import data_helper
 from data_helper import AmazonPreprocessor
