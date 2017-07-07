@@ -42,8 +42,8 @@ from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 
 import data_helper
 from data_helper import AmazonPreprocessor
-from keras_helper import AmazonKerasClassifier, Fbeta
-#from kaggle_data.downloader import KaggleDataDownloader
+from keras_helper import AmazonKerasClassifier
+from kaggle_data.downloader import KaggleDataDownloader
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
@@ -197,33 +197,14 @@ preprocessor.y_map
 
 # <markdowncell>
 
-# ## Callbacks
+# ## Create a checkpoint
 # 
-# 
-# 
-# __Checkpoint__
-# 
-# Saves the best model weights across all epochs in the training process.
-# 
-# __CSVLogger__
-# 
-# Creates a file with a log of loss and accuracy per epoch
-# 
-# __FBeta__
-# 
-# Calculates fbeta_score after each epoch during training
+# Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
 
 # <codecell>
 
-from keras.callbacks import ModelCheckpoint, EarlyStopping, History, CSVLogger
-
-checkpoint = ModelCheckpoint(filepath="weights.best.hdf5", monitor='val_acc', verbose=1, save_best_only=True)
-
-# creates a file with a log of loss and accuracy per epoch
-csv = CSVLogger(filename='training.log', append=True)
-
-# Calculates fbeta_score after each epoch during training
-fbeta = Fbeta()
+filepath="weights.best.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
 
 # <markdowncell>
 
@@ -257,11 +238,9 @@ classifier.add_ann_layer(len(preprocessor.y_map))
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
-                                                                           train_callbacks=[checkpoint, fbeta, csv])
+                                                                           train_callbacks=[checkpoint])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
-
-print(fbeta.fbeta)
 
 # <markdowncell>
 
@@ -292,7 +271,7 @@ plt.legend();
 
 # <markdowncell>
 
-# Look at our overall fbeta_score
+# Look at our fbeta_score
 
 # <codecell>
 
