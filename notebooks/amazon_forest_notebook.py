@@ -43,7 +43,7 @@ from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
 import data_helper
 from data_helper import AmazonPreprocessor
 from keras_helper import AmazonKerasClassifier, Fbeta
-#from kaggle_data.downloader import KaggleDataDownloader
+from kaggle_data.downloader import KaggleDataDownloader
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
