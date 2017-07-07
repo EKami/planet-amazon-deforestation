@@ -21,7 +21,7 @@ from keras.models import load_model
 from tensorflow.contrib.keras import backend
 
 
-class Fbeta(keras.callbacks.Callback):
+class Fbeta(Callback):
     def on_train_begin(self, logs={}):
         self.fbeta = []
     def on_epoch_end(self, epoch, logs ={}):
@@ -73,14 +73,14 @@ class AmazonKerasClassifier:
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        
+
         self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        
+
         self.classifier.add(Conv2D(512, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))

@@ -38,7 +38,7 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping, History, CSVLogger
 
 import data_helper
 from data_helper import AmazonPreprocessor
@@ -214,8 +214,6 @@ preprocessor.y_map
 # Calculates fbeta_score after each epoch during training
 
 # <codecell>
-
-from keras.callbacks import ModelCheckpoint, EarlyStopping, History, CSVLogger
 
 checkpoint = ModelCheckpoint(filepath="weights.best.hdf5", monitor='val_acc', verbose=1, save_best_only=True)
 
