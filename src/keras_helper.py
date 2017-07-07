@@ -7,6 +7,7 @@ from sklearn.metrics import fbeta_score
 from PIL import Image
 
 import tensorflow.contrib.keras.api.keras as k
+import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
@@ -18,6 +19,17 @@ from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import load_model
 from tensorflow.contrib.keras import backend
+
+
+class Fbeta(Callback):
+    def on_train_begin(self, logs={}):
+        self.fbeta = []
+    def on_epoch_end(self, epoch, logs ={}):
+        p_valid = self.model.predict(self.validation_data[0])
+        y_val = self.validation_data[1]
+        f_beta = fbeta_score(y_val, np.array(p_valid) > 0.2, beta=2, average='samples')
+        self.fbeta.append(f_beta)
+        return
 
 
 class LossHistory(Callback):
@@ -61,14 +73,14 @@ class AmazonKerasClassifier:
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        
+
         self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        
+
         self.classifier.add(Conv2D(512, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
