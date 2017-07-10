@@ -1,6 +1,7 @@
 from src.data_helper import AmazonPreprocessor
 from src.data_helper import get_jpeg_data_files_paths
 from src.gans import Gans
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -22,13 +23,18 @@ class TestGans:
         gans.add_generator()
         gans.add_discriminator_model()
         gans.add_adversarial_model()
-        d_loss, a_loss = gans.train()
+        d_acc, a_acc = gans.train()
         images_generated, labels_generated = gans.generate(30)
 
+        # "De normalize" the image
+        # for i in range(len(images_generated)):
+        #     images_generated[i] = images_generated[i] * 255
+        #
+        # images_generated = np.int32(images_generated)
         print("Labels fake result 1:", labels_generated[0])
 
-        plt.plot(d_loss[1], label='Discriminator accuracy')
-        plt.plot(a_loss[1], label='Adversarial accuracy')
+        plt.plot(d_acc, label='Discriminator accuracy')
+        plt.plot(a_acc, label='Adversarial accuracy')
         plt.legend()
         plt.show()
 

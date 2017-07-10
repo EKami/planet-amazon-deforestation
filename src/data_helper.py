@@ -9,6 +9,7 @@ from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
 
 
@@ -64,12 +65,17 @@ class AmazonPreprocessor:
         # The validation data cannot be preprocessed in batches as we also need them to compute the f2 score
         self.X_val, self.y_val = self._preprocess_val_files()
 
-    def get_train_generator(self, batch_size):
+    def get_train_generator(self, batch_size, scale_mode=1):
         """
         Returns a batch generator which transforms chunk of raw images into numpy matrices
         and then "yield" them for the classifier. Doing so allow to greatly optimize
         memory usage as the images are processed then deleted by chunks (defined by batch_size)
         instead of preprocessing them all at once and feeding them to the classifier.
+        :param scale_mode: int
+            The scale mode for the images.
+                0 : No scaling
+                1 : Normalize (Divide by 255)
+                2 : Scale between -1 and 1
         :param batch_size: int
             The batch size
         :return: generator
@@ -105,7 +111,13 @@ class AmazonPreprocessor:
                     # Augment the image `img` here
 
                     # Convert to RGB and normalize
-                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32)
+                    if scale_mode == 1:
+                        img_array = img_array / 255
+                    elif scale_mode == 2:
+                        pass
+                        # TODO finish
+
                     batch_features[j] = img_array
                     batch_labels[j] = self.y_train[start_offset + j]
 
