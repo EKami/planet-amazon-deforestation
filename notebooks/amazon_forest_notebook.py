@@ -32,18 +32,31 @@ sys.path.append('../tests')
 
 import os
 import gc
+import bcolz
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from keras.callbacks import ModelCheckpoint, CSVLogger
+from keras.callbacks import ModelCheckpoint, CSVLogger, History
 
 import data_helper
 from data_helper import AmazonPreprocessor
 from keras_helper import AmazonKerasClassifier, Fbeta
 from kaggle_data.downloader import KaggleDataDownloader
+
+# Finetuning Imports
+import densenet169
+from densenet169 import *
+from keras import optimizers
+from keras.models import Model
+from sklearn.metrics import fbeta_score
+from keras.layers import Dropout, Flatten, Dense, Input
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers.normalization import BatchNormalization
+from keras.optimizers import Adam, Adamax, SGD
+
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
@@ -172,7 +185,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 
 # <codecell>
 
-img_resize = (128, 128) # The resize size of each image ex: (64, 64) or None to use the default image size
+img_resize = (256, 256) # The resize size of each image ex: (64, 64) or None to use the default image size
 validation_split_size = 0.2
 
 # <markdowncell>
@@ -223,41 +236,56 @@ csv = CSVLogger(filename='training.log', append=True)
 # Calculates fbeta_score after each epoch during training
 fbeta = Fbeta()
 
+# Tracks training history for later visualization
+history = History()
+
 # <markdowncell>
 
-# ## Choose Hyperparameters
+# # Funetuning
 # 
-# Choose your hyperparameters below for training. 
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults.
-# 
-# If you opted for a high `img_resize` then you may want to lower the `batch_size` to fit your images matrices into the GPU memory. With an `img_resize` of `(256, 256)` (the default size) and a batch_size of `64` you should at least have a GPU with 8GB or VRAM.
+# Here we define the model for finetuning
 
 # <codecell>
 
+import densenet169
+from densenet169 import *
+base_model = densenet169.create_model()
+
+# Create new classifier layers
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(1024, activation='relu', kernel_initializer='he_normal')(x)
+x = Dropout(0.5)(x)
+
+predictions = Dense(17, activation='sigmoid')(x)
+model = Model(inputs=base_model.input, outputs=predictions)
+
+# Freeze all bottom layers, only train classifier first
+for layer in base_model.layers:
+    layer.trainable = False
+
+# <markdowncell>
+
+# ## Train Classifier
+# We first start by training only the classifier.
+
+# <codecell>
+
+#Choose Hyperparameters & Compile
 batch_size = 64
-epochs_arr = [35, 15, 5]
-learn_rates = [0.002, 0.0002, 0.00002]
+learn_rate = 0.002
+opt = Adamax(lr=learn_rate)
+model.compile(optimizer=opt, loss='binary_crossentropy', metrics = ['accuracy'])
 
-# <markdowncell>
+# Define generator and validation set
+train_generator = preprocessor.get_train_generator(batch_size)
+X_val, y_val = preprocessor.X_val, preprocessor.y_val
 
-# ## Define and Train model
-# 
-# Here we define the model and begin training. 
 
-# <codecell>
-
-classifier = AmazonKerasClassifier(preprocessor)
-classifier.add_conv_layer()
-classifier.add_flatten_layer()
-classifier.add_ann_layer(len(preprocessor.y_map))
-
-train_losses, val_losses = [], []
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
-                                                                           train_callbacks=[checkpoint, fbeta, csv])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
+# Training
+hist = model.fit_generator(train_generator, len(preprocessor.X_train) / batch_size,
+                    epochs=20, verbose=1, validation_data=(X_val, y_val),
+                    callbacks=[history, checkpoint, csv, fbeta])
 
 print(fbeta.fbeta)
 
@@ -271,7 +299,7 @@ print(fbeta.fbeta)
 
 # <codecell>
 
-classifier.load_weights("weights.best.hdf5")
+model.load_weights("weights.best.hdf5")
 print("Weights loaded")
 
 # <markdowncell>
@@ -284,9 +312,14 @@ print("Weights loaded")
 
 # <codecell>
 
-plt.plot(train_losses, label='Training loss')
-plt.plot(val_losses, label='Validation loss')
-plt.legend();
+plt.plot(range(epochs), hist.history[
+         'val_loss'], 'b-', label='Val Loss')
+plt.plot(range(epochs), hist.history[
+         'loss'], 'g--', label='Train Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
 
 # <markdowncell>
 
@@ -294,7 +327,87 @@ plt.legend();
 
 # <codecell>
 
-fbeta_score
+def get_fbeta_score(model, X_valid, y_valid):
+    p_valid = model.predict(X_valid)
+    return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
+
+get_fbeta_score(model, X_val, y_val)
+
+# <markdowncell>
+
+# ## Fine-tune conv layers
+# Now that we have a trained classifier, we can unfreeze all other layers in the model (or keep certain layers still frozen) and retrain. 
+
+# <codecell>
+
+# We can either freeze the first X number of layers and unfreeze only certain layers or we can unfreeze all layers:
+
+#for layer in model.layers[:69]:
+#    layer.trainable = False
+#for layer in model.layers[69:]:
+#    layer.trainable = True
+
+for layer in model.layers:
+    layer.trainable = True
+
+# we need to recompile the model for these modifications to take effect we use SGD with a low learning rate
+model.compile(optimizer=SGD(lr=0.0001, momentum=0.9), loss='binary_crossentropy', metrics = ['accuracy'])
+
+# Let's create a new log file for this one
+csv = CSVLogger('training_2.log')
+
+
+# We may need to use a reduced batch size since using the whole model here
+batch_size = 32
+train_generator = preprocessor.get_train_generator(batch_size)
+
+
+hist_bottom = model.fit_generator(train_generator, len(preprocessor.X_train) / batch_size,
+                    epochs=100, verbose=1, validation_data=(X_val, y_val),
+                    callbacks=[history, checkpoint, csv, fbeta])
+
+print(fbeta.fbeta)
+
+# <codecell>
+
+model.load_weights("weights.best.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+get_fbeta_score(model, X_val, y_val)
+
+# <codecell>
+
+p_valid = model.predict(X_val)
+
+def optimise_f2_thresholds(y, p, verbose=True, resolution=75):
+    def mf(x):
+        p2 = np.zeros_like(p)
+        for i in range(17):
+            p2[:, i] = (p[:, i] > x[i]).astype(np.int)
+        score = fbeta_score(y, p2, beta=2, average='samples')
+        return score
+    x = [0.2]*17
+    for i in range(17):
+        best_i2 = 0
+        best_score = 0
+        for i2 in range(resolution):
+            i2 /= resolution
+            x[i] = i2
+            score = mf(x)
+            if score > best_score:
+                best_i2 = i2
+                best_score = score
+        x[i] = best_i2
+        if verbose:
+            print(i, best_i2, best_score)
+        
+    return x
+
+# <codecell>
+
+optimise_f2_thresholds(y_val, np.array(p_valid), verbose=True, resolution=75)
 
 # <markdowncell>
 
@@ -302,10 +415,37 @@ fbeta_score
 
 # <codecell>
 
-predictions, x_test_filename = classifier.predict(batch_size)
+def predict(batch_size=128):
+        """
+        Launch the predictions on the test dataset as well as the additional test dataset
+        :return:
+            predictions_labels: list
+                An array containing 17 length long arrays
+            filenames: list
+                File names associated to each prediction
+        """
+        generator = preprocessor.get_prediction_generator(batch_size)
+        predictions_labels = model.predict_generator(generator=generator, verbose=1,
+                                                     steps=len(preprocessor.X_test_filename) / batch_size)
+        assert len(predictions_labels) == len(preprocessor.X_test), \
+            "len(predictions_labels) = {}, len(preprocessor.X_test) = {}".format(
+                len(predictions_labels), len(preprocessor.X_test))
+        return predictions_labels, np.array(preprocessor.X_test)
+
+# <codecell>
+
+predictions, x_test_filename = predict(batch_size)
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
+
+# <codecell>
+
+# Create functions to save and load tensor arrays.
+def save_array(fname, arr): c=bcolz.carray(arr, rootdir=fname, mode='w'); c.flush()
+def load_array(fname): return bcolz.open(fname)[:]
+
+save_array('dn169_predictions.bc', predictions)
 
 # <markdowncell>
 
@@ -313,12 +453,7 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 
 # <codecell>
 
-# For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
-#thresholds = [0.2] * len(labels_set)
-
-
-# <codecell>
-
+# Use thresholds generated by `optimise_f2_thresholds`
 thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
 
 # <markdowncell>
