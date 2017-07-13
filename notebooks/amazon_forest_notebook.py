@@ -365,6 +365,10 @@ print("Weights loaded")
 
 # <codecell>
 
+model.save('dn169_tuatini.h5')
+
+# <codecell>
+
 get_fbeta_score(model, X_val, y_val)
 
 # <codecell>
