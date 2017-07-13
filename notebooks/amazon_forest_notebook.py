@@ -8,9 +8,9 @@
 # <markdowncell>
 
 # Special thanks to the kernel contributors of this challenge (especially @anokas and @Kaggoo) who helped me find a starting point for this notebook.
-# 
+#
 # The whole code including the `data_helper.py` and `keras_helper.py` files are available on github [here](https://github.com/EKami/planet-amazon-deforestation) and the notebook can be found on the same github [here](https://github.com/EKami/planet-amazon-deforestation/blob/master/notebooks/amazon_forest_notebook.ipynb)
-# 
+#
 # **If you found this notebook useful some upvotes would be greatly appreciated! :) **
 
 # <markdowncell>
@@ -95,25 +95,25 @@ for dir_path in datasets_path:
 if not is_datasets_present:
     # Put your Kaggle user name and password in a $KAGGLE_USER and $KAGGLE_PASSWD env vars respectively
     downloader = KaggleDataDownloader(os.getenv("KAGGLE_USER"), os.getenv("KAGGLE_PASSWD"), competition_name)
-    
+
     train_output_path = downloader.download_dataset(train, destination_path)
     downloader.decompress(train_output_path, destination_path) # Outputs a tar file
     downloader.decompress(destination_path + train_u, destination_path) # Extract the content of the previous tar file
     os.remove(train_output_path) # Removes the 7z file
     os.remove(destination_path + train_u) # Removes the tar file
-    
+
     test_output_path = downloader.download_dataset(test, destination_path)
     downloader.decompress(test_output_path, destination_path) # Outputs a tar file
     downloader.decompress(destination_path + test_u, destination_path) # Extract the content of the previous tar file
     os.remove(test_output_path) # Removes the 7z file
     os.remove(destination_path + test_u) # Removes the tar file
-    
+
     test_add_output_path = downloader.download_dataset(test_additional, destination_path)
     downloader.decompress(test_add_output_path, destination_path) # Outputs a tar file
     downloader.decompress(destination_path + test_additional_u, destination_path) # Extract the content of the previous tar file
     os.remove(test_add_output_path) # Removes the 7z file
     os.remove(destination_path + test_additional_u) # Removes the tar file
-    
+
     test_labels_output_path = downloader.download_dataset(test_labels, destination_path)
     downloader.decompress(test_labels_output_path, destination_path) # Outputs a csv file
     os.remove(test_labels_output_path) # Removes the zip file
@@ -162,7 +162,7 @@ sns.barplot(x=labels_s, y=labels_s.index, orient='h')
 
 # <codecell>
 
-images_title = [labels_df[labels_df['tags'].str.contains(label)].iloc[i]['image_name'] + '.jpg' 
+images_title = [labels_df[labels_df['tags'].str.contains(label)].iloc[i]['image_name'] + '.jpg'
                 for i, label in enumerate(labels_set)]
 
 plt.rc('axes', grid=False)
@@ -177,10 +177,10 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 # <markdowncell>
 
 # # Image resize & validation split
-# Define the dimensions of the image data trained by the network. Recommended resized images could be 32x32, 64x64, or 128x128 to speedup the training. 
-# 
+# Define the dimensions of the image data trained by the network. Recommended resized images could be 32x32, 64x64, or 128x128 to speedup the training.
+#
 # You could also use `None` to use full sized images.
-# 
+#
 # Be careful, the higher the `validation_split_size` the more RAM you will consume.
 
 # <codecell>
@@ -191,13 +191,13 @@ validation_split_size = 0.2
 # <markdowncell>
 
 # # Data preprocessing
-# Due to the hudge amount of memory the preprocessed images can take, we will create a dedicated `AmazonPreprocessor` class which job is to preprocess the data right in time at specific steps (training/inference) so that our RAM don't get completely filled by the preprocessed images. 
-# 
+# Due to the hudge amount of memory the preprocessed images can take, we will create a dedicated `AmazonPreprocessor` class which job is to preprocess the data right in time at specific steps (training/inference) so that our RAM don't get completely filled by the preprocessed images.
+#
 # The only exception to this being the validation dataset as we need to use it as-is for f2 score calculation as well as when we calculate the validation accuracy of each batch.
 
 # <codecell>
 
-preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional, 
+preprocessor = AmazonPreprocessor(train_jpeg_dir, train_csv_file, test_jpeg_dir, test_jpeg_additional,
                                   img_resize, validation_split_size)
 preprocessor.init()
 
@@ -211,19 +211,19 @@ preprocessor.y_map
 # <markdowncell>
 
 # ## Callbacks
-# 
-# 
-# 
+#
+#
+#
 # __Checkpoint__
-# 
+#
 # Saves the best model weights across all epochs in the training process.
-# 
+#
 # __CSVLogger__
-# 
+#
 # Creates a file with a log of loss and accuracy per epoch
-# 
+#
 # __FBeta__
-# 
+#
 # Calculates fbeta_score after each epoch during training
 
 # <codecell>
@@ -242,7 +242,7 @@ history = History()
 # <markdowncell>
 
 # # Funetuning
-# 
+#
 # Here we define the model for finetuning
 
 # <codecell>
@@ -253,12 +253,23 @@ base_model = densenet169.create_model()
 
 # Create new classifier layers
 x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dense(1024, activation='relu', kernel_initializer='he_normal')(x)
-x = Dropout(0.5)(x)
 
-predictions = Dense(17, activation='sigmoid')(x)
-model = Model(inputs=base_model.input, outputs=predictions)
+x = BatchNormalization()(x)
+x = Convolution2D(128,3,3, activation='relu', border_mode='same')(x)
+x = BatchNormalization()(x)
+x = MaxPooling2D()(x)
+x = Convolution2D(128,3,3, activation='relu', border_mode='same')(x)
+x = BatchNormalization()(x)
+x = MaxPooling2D()(x)
+x = Convolution2D(128,3,3, activation='relu', border_mode='same')(x)
+x = BatchNormalization()(x)
+x = MaxPooling2D((1,2))(x)
+x = Convolution2D(17,3,3, border_mode='same')(x)
+x = Dropout(0.)(x)
+x = GlobalAveragePooling2D()(x)
+
+predictions = Activation('sigmoid')(x)
+model = Model(base_model.input, predictions)
 
 # Freeze all bottom layers, only train classifier first
 for layer in base_model.layers:
@@ -336,7 +347,7 @@ get_fbeta_score(model, X_val, y_val)
 # <markdowncell>
 
 # ## Fine-tune conv layers
-# Now that we have a trained classifier, we can unfreeze all other layers in the model (or keep certain layers still frozen) and retrain. 
+# Now that we have a trained classifier, we can unfreeze all other layers in the model (or keep certain layers still frozen) and retrain.
 
 # <codecell>
 
@@ -402,7 +413,7 @@ def optimise_f2_thresholds(y, p, verbose=True, resolution=75):
         x[i] = best_i2
         if verbose:
             print(i, best_i2, best_score)
-        
+
     return x
 
 # <codecell>
@@ -435,7 +446,7 @@ def predict(batch_size=128):
 # <codecell>
 
 predictions, x_test_filename = predict(batch_size)
-print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
+print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape,
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
 
