@@ -315,25 +315,6 @@ print("Weights loaded")
 
 # <markdowncell>
 
-# ## Monitor the results
-
-# <markdowncell>
-
-# Check that we do not overfit by plotting the losses of the train and validation sets
-
-# <codecell>
-
-plt.plot(range(epochs), hist.history[
-         'val_loss'], 'b-', label='Val Loss')
-plt.plot(range(epochs), hist.history[
-         'loss'], 'g--', label='Train Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
-
-# <markdowncell>
-
 # Look at our overall fbeta_score
 
 # <codecell>
@@ -369,7 +350,7 @@ csv = CSVLogger('training_2.log')
 
 
 # We may need to use a reduced batch size since using the whole model here
-batch_size = 32
+batch_size = 16
 train_generator = preprocessor.get_train_generator(batch_size)
 
 
