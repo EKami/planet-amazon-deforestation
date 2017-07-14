@@ -77,8 +77,9 @@ class AmazonPreprocessor:
         """
         # Image Augmentation
         datagen = ImageDataGenerator(
-            width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
-            height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
+            rescale=1./255,
+            #width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
+            #height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
             zoom_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
@@ -160,6 +161,7 @@ class AmazonPreprocessor:
                     img_array[:, :, 0] -= 103.939
                     img_array[:, :, 1] -= 116.779
                     img_array[:, :, 2] -= 123.68
+                    img_array = img_array / 255
 
                     img_arrays[j] = img_array
                 yield img_arrays
@@ -291,6 +293,7 @@ class AmazonPreprocessor:
         img_array[:, :, 0] -= 103.939
         img_array[:, :, 1] -= 116.779
         img_array[:, :, 2] -= 123.68
+        img_array = img_array / 255
 
         return img_array, val_labels
 
