@@ -293,7 +293,7 @@ X_val, y_val = preprocessor.X_val, preprocessor.y_val
 
 # Training
 hist = model.fit_generator(train_generator, len(preprocessor.X_train) / batch_size,
-                    epochs=20, verbose=1, validation_data=(X_val, y_val),
+                    epochs=10, verbose=1, validation_data=(X_val, y_val),
                     callbacks=[history, checkpoint, csv, fbeta])
 
 print(fbeta.fbeta)
@@ -353,10 +353,23 @@ train_generator = preprocessor.get_train_generator(batch_size)
 
 
 hist_bottom = model.fit_generator(train_generator, len(preprocessor.X_train) / batch_size,
-                    epochs=100, verbose=1, validation_data=(X_val, y_val),
+                    epochs=10, verbose=1, validation_data=(X_val, y_val),
                     callbacks=[history, checkpoint, csv, fbeta])
 
 print(fbeta.fbeta)
+
+# <codecell>
+
+model.load_weights("weights.best.hdf5")
+print("Weights loaded")
+
+# <codecell>
+
+model.compile(optimizer=SGD(lr=0.00001, momentum=0.9), loss='binary_crossentropy', metrics = ['accuracy'])
+
+hist_bottom_2 = model.fit_generator(train_generator, len(preprocessor.X_train) / batch_size,
+                    epochs=10, verbose=1, validation_data=(X_val, y_val),
+                    callbacks=[history, checkpoint, csv, fbeta])
 
 # <codecell>
 
