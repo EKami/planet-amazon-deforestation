@@ -39,11 +39,11 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from keras.models import load_model
-from tensorflow.contrib.keras.api.keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, CSVLogger
 
 import data_helper
 from data_helper import AmazonPreprocessor
-from keras_helper import AmazonKerasClassifier
+from keras_helper import AmazonKerasClassifier, Fbeta
 from kaggle_data.downloader import KaggleDataDownloader
 
 %matplotlib inline
@@ -198,14 +198,31 @@ preprocessor.y_map
 
 # <markdowncell>
 
-# ## Create a checkpoint
+# ## Callbacks
 # 
-# Creating a checkpoint saves the best model weights across all epochs in the training process. This ensures that we will always use only the best weights when making our predictions on the test set rather than using the default which takes the final score from the last epoch. 
+# 
+# 
+# __Checkpoint__
+# 
+# Saves the best model weights across all epochs in the training process.
+# 
+# __CSVLogger__
+# 
+# Creates a file with a log of loss and accuracy per epoch
+# 
+# __FBeta__
+# 
+# Calculates fbeta_score after each epoch during training
 
 # <codecell>
 
-filepath="best_original_weights.hdf5"
-checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True)
+checkpoint = ModelCheckpoint(filepath="best_original_weights.hdf5", monitor='val_acc', verbose=1, save_best_only=True)
+
+# creates a file with a log of loss and accuracy per epoch
+csv = CSVLogger(filename='training.log', append=True)
+
+# Calculates fbeta_score after each epoch during training
+fbeta = Fbeta()
 
 # <markdowncell>
 
@@ -219,8 +236,8 @@ checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_o
 
 # <codecell>
 
-batch_size = 128
-epochs_arr = [10, 5, 3]
+batch_size = 64
+epochs_arr = [35, 15, 5]
 learn_rates = [0.002, 0.0002, 0.00002]
 
 # <markdowncell>
@@ -238,13 +255,12 @@ classifier.add_ann_layer(len(preprocessor.y_map))
 
 train_losses, val_losses = [], []
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(preprocessor.X_train, 
-                                                                           preprocessor.y_train,
-                                                                           learn_rate, epochs, batch_size,
-                                                                           augment_data=False,
-                                                                           train_callbacks=[checkpoint])
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
+                                                                           train_callbacks=[checkpoint, fbeta, csv])
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
+
+print(fbeta.fbeta)
 
 # <markdowncell>
 
@@ -275,7 +291,7 @@ plt.legend();
 
 # <markdowncell>
 
-# Look at our fbeta_score
+# Look at our overall fbeta_score
 
 # <codecell>
 
@@ -482,7 +498,12 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 # <codecell>
 
 # For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
-thresholds = [0.2] * len(labels_set)
+#thresholds = [0.2] * len(labels_set)
+
+
+# <codecell>
+
+thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
 
 # <markdowncell>
 

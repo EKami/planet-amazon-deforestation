@@ -8,6 +8,7 @@ from PIL import Image
 from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
+from sklearn.model_selection import StratifiedShuffleSplit
 from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
 
 
@@ -86,13 +87,10 @@ class AmazonPreprocessor:
         datagen = ImageDataGenerator(
             width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
             height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
-            #rotation_range=90,  # randomly rotate images 90 degrees
-            #shear_range=0.1,  # randomly shear images by 10%
-            #zoom_range=0.1,
+            zoom_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
-
-        loop_range = len(X_train_files)
+        loop_range = len(self.X_train)
         while True:
             for i in range(loop_range):
                 start_offset = batch_size * i
@@ -188,10 +186,39 @@ class AmazonPreprocessor:
             targets[labels_map[t]] = 1
         return file_path, targets
 
+    def _get_validation_split(self):
+        train = pd.read_csv(self.train_csv_file)
+        # mapping labels to integer classes
+        flatten = lambda l: [item for sublist in l for item in sublist]
+        labels = list(set(flatten([l.split(' ') for l in train['tags'].values])))
+        label_map = {l: i for i, l in enumerate(labels)}
+
+        y_train = []
+        for f,tags in (train.values):
+            targets = np.zeros(len(label_map))
+            for t in tags.split(' '):
+                targets[label_map[t]] = 1
+            y_train.append(targets)
+
+        y_train = np.array(y_train, np.uint8)
+        trn_index = []
+        val_index = []
+        index = np.arange(len(train))
+        for i in (range(len(label_map))):
+            sss = StratifiedShuffleSplit(n_splits=2, test_size=self.validation_split, random_state=i)
+            for train_index, test_index in sss.split(index,y_train[:,i]):
+                X_train, X_test = index[train_index], index[test_index]
+            # to ensure there is no repetetion within each split and between the splits
+            trn_index = trn_index + list(set(X_train) - set(trn_index) - set(val_index))
+            val_index = val_index + list(set(X_test) - set(val_index) - set(trn_index))
+        return np.array(trn_index), np.array(val_index)
+
     def _get_train_data_files(self):
         labels_df = pd.read_csv(self.train_csv_file)
         x_train_files, y_train_files = [], []
         x_val_files, y_val_files = [], []
+        train_files, train_tags = [], []
+        val_files, val_tags = [], []
 
         files_path = []
         tags_list = []
@@ -199,9 +226,14 @@ class AmazonPreprocessor:
             files_path.append('{}/{}.jpg'.format(self.train_jpeg_dir, file_name))
             tags_list.append(tags)
 
-        limit = int(len(files_path) * (1 - self.validation_split))
-        train_files, train_tags = files_path[:limit], tags_list[:limit]
-        val_files, val_tags = files_path[limit:], tags_list[limit:]
+        trn_index, val_index = self._get_validation_split()
+
+        for index in trn_index:
+            train_files.append(files_path[index])
+            train_tags.append(tags_list[index])
+        for index in val_index:
+            val_files.append(files_path[index])
+            val_tags.append(tags_list[index])
 
         labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         y_map = {l: i for i, l in enumerate(labels)}

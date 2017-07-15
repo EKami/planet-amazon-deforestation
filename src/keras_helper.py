@@ -7,14 +7,29 @@ from sklearn.metrics import fbeta_score
 from PIL import Image
 
 import tensorflow.contrib.keras.api.keras as k
-from tensorflow.contrib.keras.api.keras import initializers
-from tensorflow.contrib.keras.api.keras import regularizers
-from tensorflow.contrib.keras.api.keras.models import Sequential
-from tensorflow.contrib.keras.api.keras.layers import Dense, Dropout, Flatten, Activation
-from tensorflow.contrib.keras.api.keras.layers import Conv2D, MaxPooling2D, BatchNormalization
-from tensorflow.contrib.keras.api.keras.optimizers import Adam, Adamax
-from tensorflow.contrib.keras.api.keras.callbacks import Callback, EarlyStopping
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers.normalization import BatchNormalization
+from keras import initializers
+from keras import regularizers
+from keras.optimizers import Adamax
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.preprocessing.image import ImageDataGenerator
+from keras.models import load_model
 from tensorflow.contrib.keras import backend
+
+
+class Fbeta(Callback):
+    def on_train_begin(self, logs={}):
+        self.fbeta = []
+    def on_epoch_end(self, epoch, logs ={}):
+        p_valid = self.model.predict(self.validation_data[0])
+        y_val = self.validation_data[1]
+        f_beta = fbeta_score(y_val, np.array(p_valid) > 0.2, beta=2, average='samples')
+        self.fbeta.append(f_beta)
+        return
 
 
 class LossHistory(Callback):
@@ -38,44 +53,44 @@ class AmazonKerasClassifier:
         img_channels = 3
         self.classifier.add(BatchNormalization(axis=1, input_shape=(*self.preprocessor.img_resize, img_channels)))
 
-        self.classifier.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
-        self.classifier.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
-        self.classifier.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
-        self.classifier.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(Conv2D(128, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(128, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
 
-        self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same'))
-        self.classifier.add(Conv2D(256, (3, 3), activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(Conv2D(256, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
         self.classifier.add(MaxPooling2D(pool_size=2))
         self.classifier.add(Dropout(0.25))
-        
-        # This model works a bit better:
-        # self.classifier.add(BatchNormalization(input_shape=(*self.preprocessor.img_resize, img_channels)))
-        #
-        # self.classifier.add(Conv2D(32, (3, 3), padding='same', activation='relu'))
-        # self.classifier.add(Conv2D(32, (3, 3), activation='relu'))
-        # self.classifier.add(MaxPooling2D(pool_size=2))
-        # self.classifier.add(Dropout(0.25))
-        #
-        # self.classifier.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-        # self.classifier.add(Conv2D(64, (3, 3), activation='relu'))
-        # self.classifier.add(MaxPooling2D(pool_size=2))
-        # self.classifier.add(Dropout(0.25))
+
+        self.classifier.add(Conv2D(512, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal'))
+        self.classifier.add(BatchNormalization())
+        self.classifier.add(MaxPooling2D(pool_size=2))
+        self.classifier.add(Dropout(0.25))
 
     def add_flatten_layer(self):
         self.classifier.add(Flatten())
 
     def add_ann_layer(self, output_size):
-        self.classifier.add(Dense(512, kernel_initializer='he_normal', activation='relu'))
+        self.classifier.add(Dense(512, activation='relu', kernel_initializer='he_normal'))
         self.classifier.add(BatchNormalization())
         self.classifier.add(Dropout(0.5))
         self.classifier.add(Dense(output_size, activation='sigmoid'))
@@ -94,8 +109,8 @@ class AmazonKerasClassifier:
 
         self.classifier.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-        # early stopping will auto-stop training process if model stops learning after 4 epochs
-        earlyStopping = EarlyStopping(monitor='val_loss', patience=4, verbose=0, mode='auto')
+        # early stopping will auto-stop training process if model stops learning after 3 epochs
+        earlyStopping = EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='auto')
         self.classifier.fit_generator(train_generator, len(self.preprocessor.X_train) / batch_size,
                                       epochs=epoch,
                                       verbose=1,
