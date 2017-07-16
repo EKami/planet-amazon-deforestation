@@ -175,7 +175,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 # <codecell>
 
 img_resize = (128, 128) # The resize size of each image ex: (64, 64) or None to use the default image size
-validation_split_size = 0.2
+validation_split_size = 0.1
 
 # <markdowncell>
 
@@ -255,11 +255,13 @@ classifier.add_conv_layer()
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(preprocessor.y_map))
 
+weights_loaded = False
 loss_rdir = 'saved_loss'
 train_losses, val_losses, fbeta_score = [], [], None
 if os.path.exists(or_weights_path) and os.path.exists(loss_rdir):
     classifier.load_weights(or_weights_path)
     train_losses, val_losses, fbeta_score = bcolz.open(loss_rdir)
+    weights_loaded = True
     print("Weights loaded")
 else:
     for learn_rate, epochs in zip(learn_rates, epochs_arr):
@@ -273,6 +275,18 @@ else:
     c = bcolz.carray([train_losses, val_losses, fbeta_score], rootdir=loss_rdir, mode='w')
     c.flush()
     print(fbeta.fbeta)
+
+# <markdowncell>
+
+# ## Check validation set consistency
+# Here we check if our validation set loss is consistent. Otherwise it would mean that it is too small.
+
+# <codecell>
+
+if not weights_loaded:
+    classifier.show_validation_set_consistency()
+else:
+    print("The validation set has already been checked")
 
 # <markdowncell>
 
@@ -332,62 +346,8 @@ y_pseudo.shape
 
 # <markdowncell>
 
-# ## Re-train with Pseudo Labeling
-# 
+# ## Re-train with Pseudo labels
 # We take the same model from before and train it against pseudo labeled images
-
-# <codecell>
-
-checkpoint = ModelCheckpoint("pseudo_labeling_weights.hdf5", monitor='val_acc', 
-                             verbose=1, save_best_only=True, mode='max')
-
-# <markdowncell>
-
-# Here we will retrain using the pseudo labeling dataset
-
-# <codecell>
-
-epochs_arr = [5, 3]
-learn_rates = [0.002, 0.0002]
-
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
-                                                                           learn_rate, epochs, batch_size, 
-                                                                           augment_data=False, 
-                                                                           train_callbacks=[checkpoint])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
-
-# <markdowncell>
-
-# ## Load Best Weights from Pseudo Labeling
-
-# <codecell>
-
-classifier.load_weights("pseudo_labeling_weights.hdf5")
-print("Weights loaded")
-
-# <markdowncell>
-
-# ## Plot the loss change
-
-# <codecell>
-
-plt.plot(train_losses, label='Training loss')
-plt.plot(val_losses, label='Validation loss')
-plt.legend();
-
-# <markdowncell>
-
-# And get the fbeta score
-
-# <codecell>
-
-fbeta_score
-
-# <markdowncell>
-
-# ## Re-train with Augmentation
 
 # <codecell>
 
@@ -397,7 +357,7 @@ checkpoint = ModelCheckpoint("pseudo_labeling_with_augment_weights.hdf5", monito
 # <codecell>
 
 epochs_arr = [5, 3]
-learn_rates = [0.002, 0.0002]
+learn_rates = [0.001, 0.0001]
 
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
@@ -440,21 +400,21 @@ fbeta_score
 
 # <codecell>
 
-checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
-                             verbose=1, save_best_only=True, mode='max')
+# checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
+#                              verbose=1, save_best_only=True, mode='max')
 
 # <codecell>
 
-epochs_arr = [5]
-learn_rates = [0.002]
+# epochs_arr = [5]
+# learn_rates = [0.002]
 
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
-                                                                           learn_rate, epochs, batch_size=64, 
-                                                                           augment_data=True, 
-                                                                           train_callbacks=[checkpoint])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
+# for learn_rate, epochs in zip(learn_rates, epochs_arr):
+#     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
+#                                                                            learn_rate, epochs, batch_size=64, 
+#                                                                            augment_data=True, 
+#                                                                            train_callbacks=[checkpoint])
+#     train_losses += tmp_train_losses
+#     val_losses += tmp_val_losses
 
 # <markdowncell>
 
@@ -462,8 +422,8 @@ for learn_rate, epochs in zip(learn_rates, epochs_arr):
 
 # <codecell>
 
-classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
-print("Weights loaded")
+# classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
+# print("Weights loaded")
 
 # <markdowncell>
 

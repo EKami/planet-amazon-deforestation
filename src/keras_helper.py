@@ -122,6 +122,15 @@ class AmazonKerasClassifier:
     def save_weights(self, weight_file_path):
         self.classifier.save_weights(weight_file_path)
 
+    def show_validation_set_consistency(self):
+        # Should be retrieved by batches instead
+        X_val, y_val = self.preprocessor.X_val, self.preprocessor.y_val
+        val_res = [self.classifier.evaluate(x, y) for x, y in
+                   zip(np.array_split(X_val, 10), np.array_split(y_val, 10))]
+        print("If the following loss are consistent then the validation set is ok")
+        for x, y in val_res:
+            print(np.round([x, y], 2))
+
     def load_weights(self, weight_file_path):
         self.classifier.load_weights(weight_file_path)
 
