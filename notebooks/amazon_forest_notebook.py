@@ -32,6 +32,7 @@ sys.path.append('../tests')
 
 import os
 import gc
+import bcolz
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -216,7 +217,8 @@ preprocessor.y_map
 
 # <codecell>
 
-checkpoint = ModelCheckpoint(filepath="best_original_weights.hdf5", monitor='val_acc', verbose=1, save_best_only=True)
+or_weights_path = "best_original_weights.hdf5"
+checkpoint = ModelCheckpoint(filepath=or_weights_path, monitor='val_acc', verbose=1, save_best_only=True)
 
 # creates a file with a log of loss and accuracy per epoch
 csv = CSVLogger(filename='training.log', append=True)
@@ -253,30 +255,24 @@ classifier.add_conv_layer()
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(preprocessor.y_map))
 
-train_losses, val_losses = [], []
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(preprocessor.X_train, 
-                                                                           preprocessor.y_train,
-                                                                           learn_rate, epochs, batch_size,
-                                                                           augment_data=False,
-                                                                           train_callbacks=[checkpoint, fbeta, csv])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
-
-print(fbeta.fbeta)
-
-# <markdowncell>
-
-# ## Load Best Weights
-
-# <markdowncell>
-
-# Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
-
-# <codecell>
-
-classifier.load_weights("best_original_weights.hdf5")
-print("Weights loaded")
+loss_rdir = 'saved_loss'
+train_losses, val_losses, fbeta_score = [], [], None
+if os.path.exists(or_weights_path) and os.path.exists(loss_rdir):
+    classifier.load_weights(or_weights_path)
+    train_losses, val_losses, fbeta_score = bcolz.open(loss_rdir)
+    print("Weights loaded")
+else:
+    for learn_rate, epochs in zip(learn_rates, epochs_arr):
+        tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(preprocessor.X_train, 
+                                                                               preprocessor.y_train, 
+                                                                               learn_rate, epochs, batch_size,
+                                                                               augment_data=True,
+                                                                               train_callbacks=[checkpoint, fbeta, csv])
+        train_losses += tmp_train_losses
+        val_losses += tmp_val_losses
+    c = bcolz.carray([train_losses, val_losses, fbeta_score], rootdir=loss_rdir, mode='w')
+    c.flush()
+    print(fbeta.fbeta)
 
 # <markdowncell>
 
@@ -502,10 +498,6 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 
 # For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
 #thresholds = [0.2] * len(labels_set)
-
-
-# <codecell>
-
 thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
 
 # <markdowncell>

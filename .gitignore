@@ -8,6 +8,7 @@ notebooks/original_with_augment_weights.hdf5
 notebooks/pseudo_labeling_weights.hdf5
 notebooks/pseudo_labeling_with_augment_weights.hdf5
 notebooks/training.log
+notebooks/saved_loss/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
