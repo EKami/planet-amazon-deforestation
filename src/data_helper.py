@@ -67,7 +67,7 @@ class AmazonPreprocessor:
     def get_train_generator(self, X_train_files, y_train_files, batch_size, augment_data=False):
         """
         /!\ This function should be merged with the other generator under the name "get_batch"
-        
+
         Returns a batch generator which transforms chunk of raw images into numpy matrices
         and then "yield" them for the classifier. Doing so allow to greatly optimize
         memory usage as the images are processed then deleted by chunks (defined by batch_size)
@@ -118,7 +118,6 @@ class AmazonPreprocessor:
                     img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
                     batch_features[j] = img_array
                     batch_labels[j] = y_train_files[start_offset + j]
-                    assert sum(batch_labels[j]) > 0, "Image with no label:" + batch_labels[j]
                 if augment_data:
                     # Here the next batch of the data generator (and only one for this iteration)
                     # is taken and returned in the yield statement

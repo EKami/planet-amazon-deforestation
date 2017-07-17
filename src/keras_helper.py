@@ -28,6 +28,8 @@ class Fbeta(Callback):
         p_valid = self.model.predict(self.validation_data[0])
         y_val = self.validation_data[1]
         f_beta = fbeta_score(y_val, np.array(p_valid) > 0.2, beta=2, average='samples')
+        # TODO: sometimes prediction has no labels
+        #assert sum(f_beta) > 0, "Image with no label:" + f_beta
         self.fbeta.append(f_beta)
         return
 
@@ -100,7 +102,7 @@ class AmazonKerasClassifier:
         return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
 
     def train_model(self, X_train_file_names, y_train_files, learn_rate=0.001, epoch=5,
-                    batch_size=128, augment_data=False, train_callbacks=()):
+                    batch_size=128, augment_data=False, train_callbacks=(), class_weight={}):
         history = LossHistory()
         train_generator = self.preprocessor.get_train_generator(X_train_file_names, y_train_files,
                                                                 batch_size, augment_data)
@@ -115,7 +117,8 @@ class AmazonKerasClassifier:
                                       epochs=epoch,
                                       verbose=1,
                                       validation_data=(X_val, y_val),
-                                      callbacks=[history, *train_callbacks, earlyStopping])
+                                      callbacks=[history, *train_callbacks, earlyStopping],
+                                      class_weight=class_weight)
         fbeta_score = self._get_fbeta_score(self.classifier, X_val, y_val)
         return [history.train_losses, history.val_losses, fbeta_score]
 
@@ -144,7 +147,8 @@ class AmazonKerasClassifier:
                 File names associated to each prediction
         """
         generator = self.preprocessor.get_prediction_generator(batch_size, filename_list)
-        predictions_labels = self.classifier.predict_generator(generator, len(filename_list) / batch_size)
+        predictions_labels = self.classifier.predict_generator(generator, len(filename_list) / batch_size,
+                                                               verbose=1)
         assert len(predictions_labels) == len(filename_list), \
             "len(predictions_labels) = {}, len(self.preprocessor.X_test) = {}".format(
                 len(predictions_labels), len(filename_list))

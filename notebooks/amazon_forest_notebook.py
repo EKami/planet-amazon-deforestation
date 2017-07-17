@@ -36,11 +36,14 @@ import bcolz
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from keras.models import load_model
+from sklearn.utils import class_weight
 from keras.callbacks import ModelCheckpoint, CSVLogger
+from imblearn.under_sampling import RandomUnderSampler
 
 import data_helper
 from data_helper import AmazonPreprocessor
@@ -175,7 +178,7 @@ for i, (image_name, label) in enumerate(zip(images_title, labels_set)):
 # <codecell>
 
 img_resize = (128, 128) # The resize size of each image ex: (64, 64) or None to use the default image size
-validation_split_size = 0.1
+validation_split_size = 0.2
 
 # <markdowncell>
 
@@ -199,35 +202,6 @@ preprocessor.y_map
 
 # <markdowncell>
 
-# ## Callbacks
-# 
-# 
-# 
-# __Checkpoint__
-# 
-# Saves the best model weights across all epochs in the training process.
-# 
-# __CSVLogger__
-# 
-# Creates a file with a log of loss and accuracy per epoch
-# 
-# __FBeta__
-# 
-# Calculates fbeta_score after each epoch during training
-
-# <codecell>
-
-or_weights_path = "best_original_weights.hdf5"
-checkpoint = ModelCheckpoint(filepath=or_weights_path, monitor='val_acc', verbose=1, save_best_only=True)
-
-# creates a file with a log of loss and accuracy per epoch
-csv = CSVLogger(filename='training.log', append=True)
-
-# Calculates fbeta_score after each epoch during training
-fbeta = Fbeta()
-
-# <markdowncell>
-
 # ## Choose Hyperparameters
 # 
 # Choose your hyperparameters below for training. 
@@ -240,7 +214,7 @@ fbeta = Fbeta()
 
 batch_size = 64
 epochs_arr = [35, 15, 5]
-learn_rates = [0.002, 0.0002, 0.00002]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 # <markdowncell>
 
@@ -255,15 +229,21 @@ classifier.add_conv_layer()
 classifier.add_flatten_layer()
 classifier.add_ann_layer(len(preprocessor.y_map))
 
-weights_loaded = False
 loss_rdir = 'saved_loss'
+or_weights_path = "best_original_weights.hdf5"
 train_losses, val_losses, fbeta_score = [], [], None
-if os.path.exists(or_weights_path) and os.path.exists(loss_rdir):
-    classifier.load_weights(or_weights_path)
+
+if os.path.exists(loss_rdir) and os.path.exists(or_weights_path):
     train_losses, val_losses, fbeta_score = bcolz.open(loss_rdir)
-    weights_loaded = True
-    print("Weights loaded")
+    print("Weights will be loaded from disk")
 else:
+    # Saves the best model weights across all epochs in the training process.
+    checkpoint = ModelCheckpoint(filepath=or_weights_path, monitor='val_acc', verbose=1, save_best_only=True)
+    # Creates a file with a log of loss and accuracy per epoch
+    csv = CSVLogger(filename='training.log', append=True)
+    # Calculates fbeta_score after each epoch during training
+    fbeta = Fbeta()
+    
     for learn_rate, epochs in zip(learn_rates, epochs_arr):
         tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(preprocessor.X_train, 
                                                                                preprocessor.y_train, 
@@ -274,19 +254,21 @@ else:
         val_losses += tmp_val_losses
     c = bcolz.carray([train_losses, val_losses, fbeta_score], rootdir=loss_rdir, mode='w')
     c.flush()
-    print(fbeta.fbeta)
+    # Here we check if our validation set loss is consistent. Otherwise it would mean that it is too small.
+    classifier.show_validation_set_consistency()
+    # Show the fbeta score evolution for each epochs
+    print("Fbeta score list:\n" + fbeta.fbeta)
 
 # <markdowncell>
 
-# ## Check validation set consistency
-# Here we check if our validation set loss is consistent. Otherwise it would mean that it is too small.
+# ## Load Best Weights
+# 
+# Loads the best weights of the training (will directly jump to this step if the model was already trained)
 
 # <codecell>
 
-if not weights_loaded:
-    classifier.show_validation_set_consistency()
-else:
-    print("The validation set has already been checked")
+classifier.load_weights(or_weights_path)
+print("Weights loaded")
 
 # <markdowncell>
 
@@ -321,28 +303,53 @@ fbeta_score
 
 # <codecell>
 
-# We don't want to use all of the test data, only a subset of it
-x_test_trunc = preprocessor.X_test_filename[:20000]
+# We predict the labels of our preprocessor.X_test_filename set
+pseudo_predictions, pseudo_paths = classifier.predict(preprocessor.X_test_filename, batch_size)
 
-# We can now concatenate our pseudo features with the training features
-x_pseudo_file_names = np.concatenate([preprocessor.X_train, x_test_trunc])
-x_pseudo_file_names.shape
+# We use the 0.2 threshold to make predictions one-hot encoded
+# TODO Use https://docs.scipy.org/doc/numpy/reference/generated/numpy.clip.html
+pseudo_predictions = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions]
+
+# <markdowncell>
+
+# ### Undersample the most used classes
+# 
+# We need to undersample the predictions which has the most seen set of labels
 
 # <codecell>
 
-# Now we predict the labels of our x_pseudo_file_names set
-pseudo_predictions, pseudo_y_filename = classifier.predict(x_pseudo_file_names, batch_size)
+# x_test_stratified = class_weight.compute_sample_weight(
+#     [{0: 1,#'agriculture'
+#      1: 11,#'artisinal_mine'
+#      2: 9,#'bare_ground'
+#      3: 12,#'blooming'
+#      4: 14,#'blow_down'
+#      5: 1,#'clear'
+#      6: 8,#'cloudy'
+#      7: 15,#'conventional_mine'
+#      8: 5,#'cultivation'
+#      9: 6,#'habitation'
+#      10: 7,#'haze'
+#      11: 4,#'partly_cloudy'
+#      12: 1,#'primary'
+#      13: 2,#'road'
+#      14: 10,#'selective_logging'
+#      15: 13,#'slash_burn'
+#      16: 3,#'water'
+#     }], pseudo_predictions)
 
-# We use the 0.2 threshold to make predictions one-hot encoded
-predictions_list = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions]
+# We can now concatenate our pseudo features with the training features
+combo_x_pseudo = np.concatenate([preprocessor.X_train, pseudo_paths])
 
 # Now we concatenate our predictions to our training labels
-y_pseudo = np.concatenate([preprocessor.y_train, predictions_list])
+combo_y_pseudo = np.concatenate([preprocessor.y_train, pseudo_predictions])
 
-# This var will be used to map the new test set predictions to their file names
-x_pseudo_file_names = np.concatenate([preprocessor.X_train, pseudo_y_filename])
+# Apply the random under-sampling
+rus = RandomUnderSampler(return_indices=True)
+combo_x_pseudo, combo_y_pseudo, idx_resampled = rus.fit_sample(combo_x_pseudo, combo_y_pseudo)
 
-y_pseudo.shape
+assert combo_x_pseudo.shape[0] == combo_y_pseudo.shape[0]
+print("X pseudo shape: {}\nY pseudo shape: {}".format(combo_x_pseudo.shape, combo_y_pseudo.shape))
 
 # <markdowncell>
 
@@ -356,14 +363,15 @@ checkpoint = ModelCheckpoint("pseudo_labeling_with_augment_weights.hdf5", monito
 
 # <codecell>
 
-epochs_arr = [5, 3]
-learn_rates = [0.001, 0.0001]
+epochs_arr = [5, 3, 2]
+learn_rates = [0.001, 0.0001, 0.00001]
 
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(combo_x_pseudo, combo_y_pseudo, 
                                                                            learn_rate, epochs, batch_size=64, 
                                                                            augment_data=True, 
-                                                                           train_callbacks=[checkpoint])
+                                                                           train_callbacks=[checkpoint],
+                                                                           class_weight=class_weight)
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
 
@@ -400,21 +408,22 @@ fbeta_score
 
 # <codecell>
 
-# checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
-#                              verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
+                             verbose=1, save_best_only=True, mode='max')
 
 # <codecell>
 
-# epochs_arr = [5]
-# learn_rates = [0.002]
+epochs_arr = [5]
+learn_rates = [0.002]
 
-# for learn_rate, epochs in zip(learn_rates, epochs_arr):
-#     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(x_pseudo_file_names, y_pseudo, 
-#                                                                            learn_rate, epochs, batch_size=64, 
-#                                                                            augment_data=True, 
-#                                                                            train_callbacks=[checkpoint])
-#     train_losses += tmp_train_losses
-#     val_losses += tmp_val_losses
+for learn_rate, epochs in zip(learn_rates, epochs_arr):
+    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(combo_x_pseudo, combo_y_pseudo,
+                                                                           learn_rate, epochs, batch_size=64, 
+                                                                           augment_data=True, 
+                                                                           train_callbacks=[checkpoint],
+                                                                           class_weight=class_weight)
+    train_losses += tmp_train_losses
+    val_losses += tmp_val_losses
 
 # <markdowncell>
 
@@ -422,8 +431,8 @@ fbeta_score
 
 # <codecell>
 
-# classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
-# print("Weights loaded")
+classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
+print("Weights loaded")
 
 # <markdowncell>
 
