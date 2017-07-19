@@ -92,7 +92,7 @@ class AmazonPreprocessor:
             zoom_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
-        loop_range = len(self.X_train)
+        loop_range = len(X_train_files)
         while True:
             for i in range(loop_range):
                 start_offset = batch_size * i

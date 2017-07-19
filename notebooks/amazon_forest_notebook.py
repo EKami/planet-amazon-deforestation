@@ -33,6 +33,7 @@ sys.path.append('../tests')
 import os
 import gc
 import bcolz
+from collections import Counter
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -43,7 +44,17 @@ import matplotlib.image as mpimg
 from keras.models import load_model
 from sklearn.utils import class_weight
 from keras.callbacks import ModelCheckpoint, CSVLogger
-from imblearn.under_sampling import RandomUnderSampler
+
+from collections import Counter
+from sklearn.datasets import make_classification
+from imblearn.over_sampling import ADASYN 
+from imblearn.under_sampling import ClusterCentroids
+from sklearn.svm import LinearSVC
+from sklearn.model_selection import train_test_split
+
+from imblearn.under_sampling import NearMiss
+from imblearn.pipeline import make_pipeline
+from imblearn.metrics import classification_report_imbalanced
 
 import data_helper
 from data_helper import AmazonPreprocessor
@@ -257,7 +268,7 @@ else:
     # Here we check if our validation set loss is consistent. Otherwise it would mean that it is too small.
     classifier.show_validation_set_consistency()
     # Show the fbeta score evolution for each epochs
-    print("Fbeta score list:\n" + fbeta.fbeta)
+    print("Fbeta score list:\n" + str(fbeta.fbeta))
 
 # <markdowncell>
 
@@ -291,6 +302,7 @@ plt.legend();
 # <codecell>
 
 fbeta_score
+#old 0.92240015515682305
 
 # <markdowncell>
 
@@ -303,12 +315,20 @@ fbeta_score
 
 # <codecell>
 
+# Take a subset of the test set
+x_subset = preprocessor.X_test_filename[:20000]
+
 # We predict the labels of our preprocessor.X_test_filename set
-pseudo_predictions, pseudo_paths = classifier.predict(preprocessor.X_test_filename, batch_size)
+pseudo_predictions, pseudo_paths = classifier.predict(x_subset, batch_size)
 
 # We use the 0.2 threshold to make predictions one-hot encoded
 # TODO Use https://docs.scipy.org/doc/numpy/reference/generated/numpy.clip.html
 pseudo_predictions = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictions]
+
+labels_list = list(preprocessor.y_map.values())
+pred_df = pd.DataFrame([[x, *y] for x, y in zip(pseudo_paths, pseudo_predictions)], columns=["file", *labels_list])
+nb_classes = [label + ": " +str(pred_df[label].value_counts()[1]) for label in labels_list]
+for count in nb_classes: print(count)
 
 # <markdowncell>
 
@@ -318,35 +338,29 @@ pseudo_predictions = [[1 if y > 0.2 else 0 for y in x] for x in pseudo_predictio
 
 # <codecell>
 
-# x_test_stratified = class_weight.compute_sample_weight(
-#     [{0: 1,#'agriculture'
-#      1: 11,#'artisinal_mine'
-#      2: 9,#'bare_ground'
-#      3: 12,#'blooming'
-#      4: 14,#'blow_down'
-#      5: 1,#'clear'
-#      6: 8,#'cloudy'
-#      7: 15,#'conventional_mine'
-#      8: 5,#'cultivation'
-#      9: 6,#'habitation'
-#      10: 7,#'haze'
-#      11: 4,#'partly_cloudy'
-#      12: 1,#'primary'
-#      13: 2,#'road'
-#      14: 10,#'selective_logging'
-#      15: 13,#'slash_burn'
-#      16: 3,#'water'
-#     }], pseudo_predictions)
+# Apply some artisanal made undersampling (LOL)
+undersampled_df = pred_df[(pred_df['conventional_mine'] == 1) | 
+                         (pred_df['blow_down'] == 1) |
+                         (pred_df['slash_burn'] == 1) |
+                         (pred_df['blooming'] == 1) |
+                         (pred_df['artisinal_mine'] == 1) |
+                         (pred_df['selective_logging'] == 1) | 
+                         (pred_df['bare_ground'] == 1) |
+                         (pred_df['cloudy'] == 1) |
+                         (pred_df['haze'] == 1) |
+                         (pred_df['habitation'] == 1) |
+                         (pred_df['cultivation'] == 1)]
+nb_classes = [label + ": " +str(undersampled_df[label].value_counts()[1]) for label in undersampled_df.columns]
+print("Undersampled classes count:")
+for count in nb_classes: print(count)
 
 # We can now concatenate our pseudo features with the training features
-combo_x_pseudo = np.concatenate([preprocessor.X_train, pseudo_paths])
+combo_x_pseudo = np.concatenate([preprocessor.X_train[:5000], [v[0] for v in undersampled_df.iloc[:, 0:1].values.tolist()]])
 
 # Now we concatenate our predictions to our training labels
-combo_y_pseudo = np.concatenate([preprocessor.y_train, pseudo_predictions])
+combo_y_pseudo = np.concatenate([preprocessor.y_train[:5000], undersampled_df.iloc[:, 1:].values.tolist()])
 
-# Apply the random under-sampling
-rus = RandomUnderSampler(return_indices=True)
-combo_x_pseudo, combo_y_pseudo, idx_resampled = rus.fit_sample(combo_x_pseudo, combo_y_pseudo)
+# <codecell>
 
 assert combo_x_pseudo.shape[0] == combo_y_pseudo.shape[0]
 print("X pseudo shape: {}\nY pseudo shape: {}".format(combo_x_pseudo.shape, combo_y_pseudo.shape))
@@ -358,31 +372,32 @@ print("X pseudo shape: {}\nY pseudo shape: {}".format(combo_x_pseudo.shape, comb
 
 # <codecell>
 
-checkpoint = ModelCheckpoint("pseudo_labeling_with_augment_weights.hdf5", monitor='val_acc', 
-                             verbose=1, save_best_only=True, mode='max')
+# Don't create a new checkpoint. Use our existing one to update it's weights
+# checkpoint = ModelCheckpoint("pseudo_labeling_with_augment_weights.hdf5", monitor='val_acc', 
+#                              verbose=1, save_best_only=True, mode='max')
 
 # <codecell>
 
 epochs_arr = [5, 3, 2]
 learn_rates = [0.001, 0.0001, 0.00001]
 
+# We don't use `checkpoint` here as the weights could have been loaded directly without creating the variable
 for learn_rate, epochs in zip(learn_rates, epochs_arr):
     tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(combo_x_pseudo, combo_y_pseudo, 
                                                                            learn_rate, epochs, batch_size=64, 
-                                                                           augment_data=True, 
-                                                                           train_callbacks=[checkpoint],
-                                                                           class_weight=class_weight)
+                                                                           augment_data=True)
     train_losses += tmp_train_losses
     val_losses += tmp_val_losses
 
 # <markdowncell>
 
-# ## Load Best Weights from Pseudo Labeling with augmentation
+# ## Load Best Weights
 
 # <codecell>
 
-classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
-print("Weights loaded")
+# Keep the weights of the original classifier merged with the pseudo labeling
+# classifier.load_weights(or_weights_path)
+# print("Weights loaded")
 
 # <markdowncell>
 
@@ -397,52 +412,6 @@ plt.legend();
 # <markdowncell>
 
 # And finally get the final f2 score
-
-# <codecell>
-
-fbeta_score
-
-# <markdowncell>
-
-# ## Resume Training without pseudo labels
-
-# <codecell>
-
-checkpoint = ModelCheckpoint("original_with_augment_weights.hdf5", monitor='val_acc', 
-                             verbose=1, save_best_only=True, mode='max')
-
-# <codecell>
-
-epochs_arr = [5]
-learn_rates = [0.002]
-
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(combo_x_pseudo, combo_y_pseudo,
-                                                                           learn_rate, epochs, batch_size=64, 
-                                                                           augment_data=True, 
-                                                                           train_callbacks=[checkpoint],
-                                                                           class_weight=class_weight)
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
-
-# <markdowncell>
-
-# ## Load Best Weights from original training set with augmentation
-
-# <codecell>
-
-classifier.load_weights("pseudo_labeling_with_augment_weights.hdf5")
-print("Weights loaded")
-
-# <markdowncell>
-
-# ## Plot the loss change
-
-# <codecell>
-
-plt.plot(train_losses, label='Training loss')
-plt.plot(val_losses, label='Validation loss')
-plt.legend();
 
 # <codecell>
 
