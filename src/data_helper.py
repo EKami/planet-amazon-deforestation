@@ -78,9 +78,7 @@ class AmazonPreprocessor:
         # Image Augmentation
         datagen = ImageDataGenerator(
             rescale=1./255,
-            #width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
-            #height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
-            zoom_range=0.2,
+            shear_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
         loop_range = len(self.X_train)
