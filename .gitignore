@@ -2,7 +2,8 @@
 input/*
 submission_file.csv
 notebooks/amazon_forest_notebook.ipynb
-notebooks/weights/weights.best.hdf5
+notebooks/weights/*
+!notebooks/weights/.keep
 notebooks/training.log
 
 # Byte-compiled / optimized / DLL files
