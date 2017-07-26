@@ -9,7 +9,7 @@ from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.model_selection import StratifiedShuffleSplit
-from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import ImageDataGenerator
 
 
 class AmazonPreprocessor:
