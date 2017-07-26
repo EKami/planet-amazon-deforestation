@@ -39,11 +39,11 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from keras.callbacks import ModelCheckpoint, CSVLogger, History
-
+from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, History
+import vgg16
 import data_helper
 from data_helper import AmazonPreprocessor
-from keras_helper import AmazonKerasClassifier, Fbeta
 from kaggle_data.downloader import KaggleDataDownloader
 
 %matplotlib inline
@@ -204,58 +204,47 @@ preprocessor.y_map
 
 # <codecell>
 
-from keras.applications.vgg16 import VGG16
-from keras.models import Model
-from keras.layers import Dense, Input, Flatten, Dropout
-from keras.layers.normalization import BatchNormalization
-
-# VGG16
-
-img_dim = (128, 128, 3)
-
-input_tensor = Input(shape=img_dim)
-
-base_model = VGG16(include_top=False,
-                   weights='imagenet',
-                   input_shape=img_dim)
-
-bn = BatchNormalization()(input_tensor)
-x = base_model(bn)
-x = Flatten()(x)
-output = Dense(17, activation='sigmoid')(x)
-
-model = Model(input_tensor, output)
-
+model = vgg16.create_model(img_dim=(128, 128, 3))
 model.summary()
 
 # <markdowncell>
 
 # ## Fine-tune conv layers
-# Now that we have a trained classifier, we can unfreeze all other layers in the model (or keep certain layers still frozen) and retrain. 
+# We will now finetune all layers in the VGG16 model. 
 
 # <codecell>
 
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
-
-callbacks = [EarlyStopping(monitor='val_loss', patience=2, verbose=1, min_delta=1e-4),
-             ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, cooldown=0, verbose=1),
+history = History()
+callbacks = [history, 
+             EarlyStopping(monitor='val_loss', patience=3, verbose=1, min_delta=1e-4),
+             ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=1, cooldown=0, min_lr=1e-7, verbose=1),
              ModelCheckpoint(filepath='weights/weights.best.hdf5', verbose=1, save_best_only=True, 
                              save_weights_only=True, mode='auto')]
 
 X_train, y_train = preprocessor.X_train, preprocessor.y_train
 X_val, y_val = preprocessor.X_val, preprocessor.y_val
 
-epochs_arr = [5, 3, 2]
-learn_rates = [1e-4, 1e-5, 1e-6]
 batch_size = 128
 train_generator = preprocessor.get_train_generator(batch_size)
-steps = len(X_train) // batch_size
+steps = len(X_train) / batch_size
 
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    model.compile(optimizer=Adam(lr=learn_rate), loss='binary_crossentropy', metrics = ['accuracy'])
-    model.fit_generator(train_generator, steps, epochs, verbose=1, 
-                        validation_data=(X_val, y_val), callbacks=callbacks)
+model.compile(optimizer=Adam(lr=1e-4), loss='binary_crossentropy', metrics = ['accuracy'])
+history = model.fit_generator(train_generator, steps, epochs=25, verbose=1, 
+                    validation_data=(X_val, y_val), callbacks=callbacks)
+
+# <markdowncell>
+
+# ## Visualize Loss Curve
+
+# <codecell>
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'], loc='upper left')
+plt.show()
 
 # <markdowncell>
 
@@ -272,13 +261,9 @@ print("Weights loaded")
 
 # <codecell>
 
-from sklearn.metrics import fbeta_score
+fbeta_score = vgg16.fbeta(model, X_val, y_val)
 
-def get_fbeta_score(model, X_valid, y_valid):
-    p_valid = model.predict(X_valid)
-    return fbeta_score(y_valid, np.array(p_valid) > 0.2, beta=2, average='samples')
-
-get_fbeta_score(model, X_val, y_val)
+fbeta_score
 
 # <markdowncell>
 
@@ -286,26 +271,7 @@ get_fbeta_score(model, X_val, y_val)
 
 # <codecell>
 
-def predict(batch_size=128):
-        """
-        Launch the predictions on the test dataset as well as the additional test dataset
-        :return:
-            predictions_labels: list
-                An array containing 17 length long arrays
-            filenames: list
-                File names associated to each prediction
-        """
-        generator = preprocessor.get_prediction_generator(batch_size)
-        predictions_labels = model.predict_generator(generator=generator, verbose=1,
-                                                     steps=len(preprocessor.X_test_filename) / batch_size)
-        assert len(predictions_labels) == len(preprocessor.X_test), \
-            "len(predictions_labels) = {}, len(preprocessor.X_test) = {}".format(
-                len(predictions_labels), len(preprocessor.X_test))
-        return predictions_labels, np.array(preprocessor.X_test)
-
-# <codecell>
-
-predictions, x_test_filename = predict(batch_size)
+predictions, x_test_filename = vgg16.predict(model, preprocessor, batch_size=128)
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
@@ -324,23 +290,7 @@ thresholds = [0.2] * len(labels_set)
 
 # <codecell>
 
-def map_predictions(predictions, thresholds):
-        """
-        Return the predictions mapped to their labels
-        :param predictions: the predictions from the predict() method
-        :param thresholds: The threshold of each class to be considered as existing or not existing
-        :return: the predictions list mapped to their labels
-        """
-        predictions_labels = []
-        for prediction in predictions:
-            labels = [preprocessor.y_map[i] for i, value in enumerate(prediction) if value > thresholds[i]]
-            predictions_labels.append(labels)
-
-        return predictions_labels
-
-# <codecell>
-
-predicted_labels = map_predictions(predictions, thresholds)
+predicted_labels = vgg16.map_predictions(preprocessor, predictions, thresholds)
 
 # <markdowncell>
 
