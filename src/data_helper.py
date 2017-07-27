@@ -9,7 +9,7 @@ from itertools import chain
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.model_selection import StratifiedShuffleSplit
-from tensorflow.contrib.keras.api.keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import ImageDataGenerator
 
 
 class AmazonPreprocessor:
@@ -77,9 +77,8 @@ class AmazonPreprocessor:
         """
         # Image Augmentation
         datagen = ImageDataGenerator(
-            width_shift_range=0.1,  # randomly shift images horizontally (10% of total width)
-            height_shift_range=0.1,  # randomly shift images vertically (10% of total height)
-            zoom_range=0.2,
+            rescale=1./255,
+            shear_range=0.2,
             horizontal_flip=True,
             vertical_flip=True)  # randomly flip images horizontally
         loop_range = len(self.X_train)
@@ -105,7 +104,14 @@ class AmazonPreprocessor:
                     # Augment the image `img` here
 
                     # Convert to RGB and normalize
-                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32)
+
+                    img_array = img_array[:, :, ::-1]
+                    # Zero-center by mean pixel
+                    img_array[:, :, 0] -= 103.939
+                    img_array[:, :, 1] -= 116.779
+                    img_array[:, :, 2] -= 123.68
+
                     batch_features[j] = img_array
                     batch_labels[j] = self.y_train[start_offset + j]
 
@@ -125,6 +131,7 @@ class AmazonPreprocessor:
         :return: generator
             The batch generator
         """
+
         # NO SHUFFLE HERE as we need our predictions to be in the same order as the inputs
         loop_range = len(self.X_test_filename)
         while True:
@@ -144,10 +151,16 @@ class AmazonPreprocessor:
                     img = Image.open(self.X_test_filename[start_offset + j])
                     img.thumbnail(self.img_resize)
 
-                    # Augment the image `img` here
-
                     # Convert to RGB and normalize
-                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
+                    img_array = np.asarray(img.convert("RGB"), dtype=np.float32)
+
+                    img_array = img_array[:, :, ::-1]
+                    # Zero-center by mean pixel
+                    img_array[:, :, 0] -= 103.939
+                    img_array[:, :, 1] -= 116.779
+                    img_array[:, :, 2] -= 123.68
+                    img_array = img_array / 255
+
                     img_arrays[j] = img_array
                 yield img_arrays
 
@@ -181,7 +194,6 @@ class AmazonPreprocessor:
         flatten = lambda l: [item for sublist in l for item in sublist]
         labels = list(set(flatten([l.split(' ') for l in train['tags'].values])))
         label_map = {l: i for i, l in enumerate(labels)}
-        inv_label_map = {i: l for l, i in label_map.items()}
 
         y_train = []
         for f,tags in (train.values):
@@ -216,14 +228,21 @@ class AmazonPreprocessor:
             files_path.append('{}/{}.jpg'.format(self.train_jpeg_dir, file_name))
             tags_list.append(tags)
 
-        trn_index, val_index = self._get_validation_split()
 
-        for index in trn_index:
-            train_files.append(files_path[index])
-            train_tags.append(tags_list[index])
-        for index in val_index:
-            val_files.append(files_path[index])
-            val_tags.append(tags_list[index])
+        if self.validation_split != 0:
+
+            trn_index, val_index = self._get_validation_split()
+            for index in trn_index:
+                train_files.append(files_path[index])
+                train_tags.append(tags_list[index])
+            for index in val_index:
+                val_files.append(files_path[index])
+                val_tags.append(tags_list[index])
+
+        else:
+            train_files = files_path
+            train_tags = tags_list
+
 
         labels = sorted(set(chain.from_iterable([tags.split(" ") for tags in labels_df['tags'].values])))
         y_map = {l: i for i, l in enumerate(labels)}
@@ -236,13 +255,14 @@ class AmazonPreprocessor:
                 x_train_files.append(file_name)
                 y_train_files.append(targets)
 
-        with ThreadPoolExecutor(self.process_count) as pool:
-            for file_name, targets in tqdm(pool.map(self._get_class_mapping,
-                                                    [(file_name, tags, y_map)
-                                                     for file_name, tags in zip(val_files, val_tags)]),
-                                           total=len(val_files)):
-                x_val_files.append(file_name)
-                y_val_files.append(targets)
+        if self.validation_split != 0:
+            with ThreadPoolExecutor(self.process_count) as pool:
+                for file_name, targets in tqdm(pool.map(self._get_class_mapping,
+                                                        [(file_name, tags, y_map)
+                                                         for file_name, tags in zip(val_files, val_tags)]),
+                                               total=len(val_files)):
+                    x_val_files.append(file_name)
+                    y_val_files.append(targets)
 
         return [x_train_files, y_train_files, x_val_files, y_val_files, {v: k for k, v in y_map.items()}]
 
@@ -264,7 +284,14 @@ class AmazonPreprocessor:
         # Augment the image `img` here
 
         # Convert to RGB and normalize
-        img_array = np.array(img.convert("RGB"), dtype=np.float32) / 255
+        img_array = np.array(img.convert("RGB"), dtype=np.float32)
+        img_array = img_array[:, :, ::-1]
+        # Zero-center by mean pixel
+        img_array[:, :, 0] -= 103.939
+        img_array[:, :, 1] -= 116.779
+        img_array[:, :, 2] -= 123.68
+        img_array = img_array / 255
+
         return img_array, val_labels
 
     def _preprocess_val_files(self):

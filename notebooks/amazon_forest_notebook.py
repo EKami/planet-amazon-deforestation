@@ -32,17 +32,18 @@ sys.path.append('../tests')
 
 import os
 import gc
+import bcolz
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from keras.callbacks import ModelCheckpoint, CSVLogger
-
+from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, History
+import vgg16
 import data_helper
 from data_helper import AmazonPreprocessor
-from keras_helper import AmazonKerasClassifier, Fbeta
 from kaggle_data.downloader import KaggleDataDownloader
 
 %matplotlib inline
@@ -190,109 +191,77 @@ preprocessor.init()
 
 # <codecell>
 
-print("X_train/y_train lenght: {}/{}".format(len(preprocessor.X_train), len(preprocessor.y_train)))
-print("X_val/y_val lenght: {}/{}".format(len(preprocessor.X_val), len(preprocessor.y_val)))
-print("X_test/X_test_filename lenght: {}/{}".format(len(preprocessor.X_test), len(preprocessor.X_test_filename)))
+print("X_train/y_train length: {}/{}".format(len(preprocessor.X_train), len(preprocessor.y_train)))
+print("X_val/y_val length: {}/{}".format(len(preprocessor.X_val), len(preprocessor.y_val)))
+print("X_test/X_test_filename length: {}/{}".format(len(preprocessor.X_test), len(preprocessor.X_test_filename)))
 preprocessor.y_map
 
 # <markdowncell>
 
-# ## Callbacks
+# # Funetuning
 # 
-# 
-# 
-# __Checkpoint__
-# 
-# Saves the best model weights across all epochs in the training process.
-# 
-# __CSVLogger__
-# 
-# Creates a file with a log of loss and accuracy per epoch
-# 
-# __FBeta__
-# 
-# Calculates fbeta_score after each epoch during training
+# Here we define the model for finetuning
 
 # <codecell>
 
-checkpoint = ModelCheckpoint(filepath="weights.best.hdf5", monitor='val_acc', verbose=1, save_best_only=True)
-
-# creates a file with a log of loss and accuracy per epoch
-csv = CSVLogger(filename='training.log', append=True)
-
-# Calculates fbeta_score after each epoch during training
-fbeta = Fbeta()
+model = vgg16.create_model(img_dim=(128, 128, 3))
+model.summary()
 
 # <markdowncell>
 
-# ## Choose Hyperparameters
-# 
-# Choose your hyperparameters below for training. 
-# 
-# Note that we have created a learning rate annealing schedule with a series of learning rates as defined in the array `learn_rates` and corresponding number of epochs for each `epochs_arr`. Feel free to change these values if you like or just use the defaults.
-# 
-# If you opted for a high `img_resize` then you may want to lower the `batch_size` to fit your images matrices into the GPU memory. With an `img_resize` of `(256, 256)` (the default size) and a batch_size of `64` you should at least have a GPU with 8GB or VRAM.
+# ## Fine-tune conv layers
+# We will now finetune all layers in the VGG16 model. 
 
 # <codecell>
 
-batch_size = 64
-epochs_arr = [35, 15, 5]
-learn_rates = [0.002, 0.0002, 0.00002]
+history = History()
+callbacks = [history, 
+             EarlyStopping(monitor='val_loss', patience=3, verbose=1, min_delta=1e-4),
+             ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=1, cooldown=0, min_lr=1e-7, verbose=1),
+             ModelCheckpoint(filepath='weights/weights.best.hdf5', verbose=1, save_best_only=True, 
+                             save_weights_only=True, mode='auto')]
+
+X_train, y_train = preprocessor.X_train, preprocessor.y_train
+X_val, y_val = preprocessor.X_val, preprocessor.y_val
+
+batch_size = 128
+train_generator = preprocessor.get_train_generator(batch_size)
+steps = len(X_train) / batch_size
+
+model.compile(optimizer=Adam(lr=1e-4), loss='binary_crossentropy', metrics = ['accuracy'])
+history = model.fit_generator(train_generator, steps, epochs=25, verbose=1, 
+                    validation_data=(X_val, y_val), callbacks=callbacks)
 
 # <markdowncell>
 
-# ## Define and Train model
-# 
-# Here we define the model and begin training. 
+# ## Visualize Loss Curve
 
 # <codecell>
 
-classifier = AmazonKerasClassifier(preprocessor)
-classifier.add_conv_layer()
-classifier.add_flatten_layer()
-classifier.add_ann_layer(len(preprocessor.y_map))
-
-train_losses, val_losses = [], []
-for learn_rate, epochs in zip(learn_rates, epochs_arr):
-    tmp_train_losses, tmp_val_losses, fbeta_score = classifier.train_model(learn_rate, epochs, batch_size, 
-                                                                           train_callbacks=[checkpoint, fbeta, csv])
-    train_losses += tmp_train_losses
-    val_losses += tmp_val_losses
-
-print(fbeta.fbeta)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'], loc='upper left')
+plt.show()
 
 # <markdowncell>
 
 # ## Load Best Weights
 
-# <markdowncell>
-
-# Here you should load back in the best weights that were automatically saved by ModelCheckpoint during training
-
 # <codecell>
 
-classifier.load_weights("weights.best.hdf5")
+model.load_weights("weights/weights.best.hdf5")
 print("Weights loaded")
 
 # <markdowncell>
 
-# ## Monitor the results
-
-# <markdowncell>
-
-# Check that we do not overfit by plotting the losses of the train and validation sets
+# ## Check Fbeta Score
 
 # <codecell>
 
-plt.plot(train_losses, label='Training loss')
-plt.plot(val_losses, label='Validation loss')
-plt.legend();
-
-# <markdowncell>
-
-# Look at our overall fbeta_score
-
-# <codecell>
+fbeta_score = vgg16.fbeta(model, X_val, y_val)
 
 fbeta_score
 
@@ -302,7 +271,7 @@ fbeta_score
 
 # <codecell>
 
-predictions, x_test_filename = classifier.predict(batch_size)
+predictions, x_test_filename = vgg16.predict(model, preprocessor, batch_size=128)
 print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\n{}".format(predictions.shape, 
                                                                               x_test_filename.shape,
                                                                               x_test_filename[0], predictions[0]))
@@ -313,13 +282,7 @@ print("Predictions shape: {}\nFiles name shape: {}\n1st predictions ({}) entry:\
 
 # <codecell>
 
-# For now we'll just put all thresholds to 0.2 but we need to calculate the real ones in the future
-#thresholds = [0.2] * len(labels_set)
-
-
-# <codecell>
-
-thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 0.2, 0.25, 0.2, 0.2, 0.25]
+thresholds = [0.2] * len(labels_set)
 
 # <markdowncell>
 
@@ -327,7 +290,7 @@ thresholds = [0.24, 0.2, 0.2, 0.2, 0.2, 0.14, 0.05, 0.2, 0.2, 0.25, 0.25, 0.24, 
 
 # <codecell>
 
-predicted_labels = classifier.map_predictions(predictions, thresholds)
+predicted_labels = vgg16.map_predictions(preprocessor, predictions, thresholds)
 
 # <markdowncell>
 
@@ -364,7 +327,6 @@ sns.barplot(x=tags_s, y=tags_s.index, orient='h');
 # <codecell>
 
 final_df.to_csv('../submission_file.csv', index=False)
-classifier.close()
 
 # <markdowncell>
 
