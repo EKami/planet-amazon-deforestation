@@ -23,3 +23,6 @@ tools/restore_jupyter_config.sh
  - [Tensorflow 1.1](https://github.com/tensorflow/tensorflow/releases/tag/v1.1.0)
  - Scipy
  - Seaborn
+ 
+ 
+ [Link to the associated gist preview of the notebook](https://gist.github.com/EKami/33ec0172590ab9f2e3a6b757c9f9dcb4)
